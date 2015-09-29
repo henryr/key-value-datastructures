@@ -3,7 +3,7 @@
 
 using namespace std;
 
-const int MAX_KEYS = 10;
+const int MAX_KEYS = 100;
 class BTree;
 
 class Node {
@@ -33,7 +33,7 @@ class BTree {
   BTree();
 
  private:
-  Node* FindLeaf(int key);
+  Node* FindLeaf(int key, bool print_height = false);
 };
 
 BTree::BTree() {
@@ -43,7 +43,7 @@ BTree::BTree() {
 
 
 int BTree::Find(int key) {
-  Node* leaf = FindLeaf(key);
+  Node* leaf = FindLeaf(key, true);
   for (int i = 0; i < leaf->keys_.size(); ++i) {
     if (leaf->keys_[i] == key) return leaf->values_[i];
     if (leaf->keys_[i] > key) return -1;
@@ -52,14 +52,19 @@ int BTree::Find(int key) {
   return -1;
 }
 
-Node* BTree::FindLeaf(int key) {
+Node* BTree::FindLeaf(int key, bool print_height) {
+  int height = 0;
   Node* cur = root_;
   while (true) {
-    if (cur->is_leaf_) return cur;
+    if (cur->is_leaf_) {
+      // if (print_height) cout << "Found leaf with height " << height << endl;
+      return cur;
+    }
     bool found = false;
     for (int i = 0; i < cur->keys_.size(); ++i) {
-      if (cur->keys_[i] > key) {
+      if (cur->keys_[i] >= key) {
         cur = cur->children_[i];
+        ++height;
         found = true;
         break;
       }
@@ -81,7 +86,7 @@ void BTree::Insert(int key, int value) {
   vector<int>::iterator val_it = node->values_.begin();
 
   for (; keys_it != node->keys_.end(); ++keys_it, ++val_it) {
-    if (*keys_it > key) {
+    if (*keys_it >= key) {
       node->keys_.insert(keys_it, key);
       node->values_.insert(val_it, value);
       break;
@@ -98,12 +103,17 @@ void BTree::Insert(int key, int value) {
 
 void Node::Split() {
   if (keys_.size() < MAX_KEYS) return;
+  // cout << "Splitting node from " << keys_[0] << " -> " << keys_.back() << endl;
   Node* new_node = MakeSplittedNode();
+  // cout << "After split, left node ends at " << keys_.back()
+  //      << ", right node begins at " << new_node->keys_[0] << ", and ends at "
+  //      << new_node->keys_.back() << endl;
+  // cout << endl;
   if (parent_ == NULL) {
     // DCHECK(btree_->root_ == this)
     Node* root = new Node(btree_);
     root->is_leaf_ = false;
-    root->keys_.push_back(new_node->keys_[0]);
+    root->keys_.push_back(keys_.back());
     root->children_.push_back(this);
     root->keys_.push_back(new_node->keys_.back());
     root->children_.push_back(new_node);
@@ -124,8 +134,8 @@ void Node::Split() {
   for (; keys_it != parent_->keys_.end(); ++keys_it, ++val_it) {
     if (*val_it == this) {
       // Rewrite the original key to point to the new max key for this node
-      *keys_it = new_node->keys_[0];
-    } else if (*keys_it > key) {
+      *keys_it = keys_.back();
+    } else if (*keys_it >= key) {
       parent_->keys_.insert(keys_it, key);
       parent_->children_.insert(val_it, new_node);
       break;
@@ -167,13 +177,13 @@ Node* Node::MakeSplittedNode() {
 
 int main(int argv, char** argc) {
   BTree btree;
-  int NUM_ENTRIES = 50;
+  int NUM_ENTRIES = 10000000;
   for (int i = 0; i < NUM_ENTRIES; ++i) {
     btree.Insert(i, i);
   }
 
   for (int i = 0; i < NUM_ENTRIES; ++i) {
     int found = btree.Find(i);
-    cout << "Val: " << i << ", found: " << found << endl;
+    if (found == -1) cout << "Val: " << i << ", found: " << found << endl;
   }
 }
