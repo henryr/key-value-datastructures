@@ -16,7 +16,7 @@ class Node {
   BTree* btree_;
 
  private:
-  Node(BTree* btree) : btree_(btree) { }
+  Node(BTree* btree) : parent_(NULL), btree_(btree) { }
   void Split();
   Node* MakeSplittedNode();
   friend class BTree;
@@ -56,9 +56,20 @@ Node* BTree::FindLeaf(int key) {
   Node* cur = root_;
   while (true) {
     if (cur->is_leaf_) return cur;
+    bool found = false;
     for (int i = 0; i < cur->keys_.size(); ++i) {
-      if (cur->keys_[i] > key) cur = cur->children_[i];
-      break;
+      if (cur->keys_[i] > key) {
+        cur = cur->children_[i];
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      // value > the largest value in the tree. We can add it to the rightmost leaf, and
+      // rewrite the index.
+      cur->keys_.back() = key + 1;
+      cur = cur->children_.back();
     }
   }
 }
@@ -90,12 +101,17 @@ void Node::Split() {
   Node* new_node = MakeSplittedNode();
   if (parent_ == NULL) {
     // DCHECK(btree_->root_ == this)
-    btree_->root_ = new Node(btree_);
-    btree_->root_->is_leaf_ = false;
-    btree_->root_->keys_.push_back(keys_.back());
-    btree_->root_->children_.push_back(this);
-    btree_->root_->keys_.push_back(new_node->keys_.back());
-    btree_->root_->children_.push_back(new_node);
+    Node* root = new Node(btree_);
+    root->is_leaf_ = false;
+    root->keys_.push_back(new_node->keys_[0]);
+    root->children_.push_back(this);
+    root->keys_.push_back(new_node->keys_.back());
+    root->children_.push_back(new_node);
+
+    new_node->parent_ = root;
+    parent_ = root;
+
+    btree_->root_ = root;
     return;
   }
 
@@ -106,9 +122,9 @@ void Node::Split() {
   int key = new_node->keys_.back();
 
   for (; keys_it != parent_->keys_.end(); ++keys_it, ++val_it) {
-    if (*keys_it == key) {
+    if (*val_it == this) {
       // Rewrite the original key to point to the new max key for this node
-      *keys_it = keys_.back();
+      *keys_it = new_node->keys_[0];
     } else if (*keys_it > key) {
       parent_->keys_.insert(keys_it, key);
       parent_->children_.insert(val_it, new_node);
@@ -126,6 +142,7 @@ void Node::Split() {
 
 Node* Node::MakeSplittedNode() {
   Node* new_node = new Node(btree_);
+  new_node->parent_ = parent_;
   for (int i = (MAX_KEYS / 2); i < MAX_KEYS; ++i) {
     new_node->keys_.push_back(keys_[i]);
     if (is_leaf_) {
@@ -150,11 +167,12 @@ Node* Node::MakeSplittedNode() {
 
 int main(int argv, char** argc) {
   BTree btree;
-  for (int i = 0; i < 100; ++i) {
+  int NUM_ENTRIES = 50;
+  for (int i = 0; i < NUM_ENTRIES; ++i) {
     btree.Insert(i, i);
   }
 
-  for (int i = 0; i < 100; ++i) {
+  for (int i = 0; i < NUM_ENTRIES; ++i) {
     int found = btree.Find(i);
     cout << "Val: " << i << ", found: " << found << endl;
   }
