@@ -1,25 +1,47 @@
+#include <assert.h>
 #include <vector>
 #include <iostream>
+#include <chrono>
 
 using namespace std;
 
 const int MAX_KEYS = 100;
+const int HALF_MAX_KEYS = MAX_KEYS / 2;
 class BTree;
 
 class Node {
  public:
   vector<int> keys_;
   vector<Node*> children_;
-  bool is_leaf_;
   vector<int> values_;
   Node* parent_;
   BTree* btree_;
 
- private:
-  Node(BTree* btree) : parent_(NULL), btree_(btree) { }
+  void Check() {
+    return;
+    if (is_leaf_) {
+      assert(children_.size() == 0);
+      assert(values_.size() == keys_.size());
+    } else {
+      assert(values_.size() == 0);
+      assert(children_.size() == keys_.size());
+    }
+  }
+
+  void SetIsLeaf(bool leaf) {
+    is_leaf_ = leaf;
+    //    assert((is_leaf_ && children_.size() == 0) || values_.size() == 0);
+  }
+
+  bool is_leaf() const { return is_leaf_; }
+
+  Node(BTree* btree) : parent_(NULL), btree_(btree), is_leaf_(false) { }
   void Split();
   Node* MakeSplittedNode();
-  friend class BTree;
+
+ private:
+  //  friend class BTree;
+  bool is_leaf_;
 };
 
 class BTree {
@@ -38,7 +60,7 @@ class BTree {
 
 BTree::BTree() {
   root_ = new Node(this);
-  root_->is_leaf_ = true;
+  root_->SetIsLeaf(true);
 }
 
 
@@ -56,10 +78,7 @@ Node* BTree::FindLeaf(int key, bool print_height) {
   int height = 0;
   Node* cur = root_;
   while (true) {
-    if (cur->is_leaf_) {
-      // if (print_height) cout << "Found leaf with height " << height << endl;
-      return cur;
-    }
+    if (cur->is_leaf()) return cur;
     bool found = false;
     for (int i = 0; i < cur->keys_.size(); ++i) {
       if (cur->keys_[i] >= key) {
@@ -73,7 +92,7 @@ Node* BTree::FindLeaf(int key, bool print_height) {
     if (!found) {
       // value > the largest value in the tree. We can add it to the rightmost leaf, and
       // rewrite the index.
-      cur->keys_.back() = key + 1;
+      cur->keys_.back() = numeric_limits<int>::max();
       cur = cur->children_.back();
     }
   }
@@ -112,7 +131,7 @@ void Node::Split() {
   if (parent_ == NULL) {
     // DCHECK(btree_->root_ == this)
     Node* root = new Node(btree_);
-    root->is_leaf_ = false;
+    root->SetIsLeaf(false);
     root->keys_.push_back(keys_.back());
     root->children_.push_back(this);
     root->keys_.push_back(new_node->keys_.back());
@@ -122,6 +141,10 @@ void Node::Split() {
     parent_ = root;
 
     btree_->root_ = root;
+
+    // root->Check();
+    // new_node->Check();
+    // this->Check();
     return;
   }
 
@@ -151,39 +174,61 @@ void Node::Split() {
 }
 
 Node* Node::MakeSplittedNode() {
+  Check();
   Node* new_node = new Node(btree_);
   new_node->parent_ = parent_;
-  for (int i = (MAX_KEYS / 2); i < MAX_KEYS; ++i) {
-    new_node->keys_.push_back(keys_[i]);
+  new_node->keys_.resize(HALF_MAX_KEYS);
+  if (is_leaf_) {
+    new_node->values_.resize(HALF_MAX_KEYS);
+  } else {
+    new_node->children_.resize(HALF_MAX_KEYS);
+  }
+  for (int i = (HALF_MAX_KEYS); i < MAX_KEYS; ++i) {
+    new_node->keys_[i - HALF_MAX_KEYS] = keys_[i];
     if (is_leaf_) {
-      new_node->values_.push_back(values_[i]);
+      new_node->values_[i - HALF_MAX_KEYS] = values_[i];
     } else {
       children_[i]->parent_ = new_node;
-      new_node->children_.push_back(children_[i]);
+      new_node->children_[i -HALF_MAX_KEYS] = children_[i];
     }
   }
 
-  keys_.resize(MAX_KEYS / 2);
+  keys_.resize(HALF_MAX_KEYS);
   if (is_leaf_) {
-    values_.resize(MAX_KEYS / 2);
-    new_node->is_leaf_ = true;
+    values_.resize(HALF_MAX_KEYS);
+    new_node->SetIsLeaf(true);
   } else {
-    children_.resize(MAX_KEYS / 2);
+    children_.resize(HALF_MAX_KEYS);
   }
+
+  // Check();
+  // new_node->Check();
 
   return new_node;
 }
 
 
 int main(int argv, char** argc) {
+  using namespace std::chrono;
   BTree btree;
   int NUM_ENTRIES = 10000000;
+  high_resolution_clock::time_point t1 = high_resolution_clock::now();
   for (int i = 0; i < NUM_ENTRIES; ++i) {
     btree.Insert(i, i);
   }
 
+  high_resolution_clock::time_point t2 = high_resolution_clock::now();
+  duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
+  cout << "Inserting " << NUM_ENTRIES << " elements took " << time_span.count() << "s, at rate of "
+       << (NUM_ENTRIES / time_span.count()) << " elements/s" << endl;
+
+  t1 = high_resolution_clock::now();
   for (int i = 0; i < NUM_ENTRIES; ++i) {
     int found = btree.Find(i);
     if (found == -1) cout << "Val: " << i << ", found: " << found << endl;
   }
+  t2 = high_resolution_clock::now();
+  time_span = duration_cast<duration<double>>(t2 - t1);
+  cout << "Searching for " << NUM_ENTRIES << " elements took " << time_span.count()
+       << "s, at rate of " << (NUM_ENTRIES / time_span.count()) << " elements/s" << endl;
 }
