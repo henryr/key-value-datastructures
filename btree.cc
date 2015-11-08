@@ -236,20 +236,17 @@ Node* Node::MakeSplittedNode() {
   new_node->keys_.resize(HALF_MAX_KEYS);
   if (is_leaf_) {
     new_node->values_.resize(HALF_MAX_KEYS);
+    memcpy(&new_node->keys_[0], &keys_[HALF_MAX_KEYS], sizeof(int) * HALF_MAX_KEYS);
+    memcpy(&new_node->values_[0], &values_[HALF_MAX_KEYS], sizeof(int) * HALF_MAX_KEYS);
   } else {
     new_node->children_.resize(HALF_MAX_KEYS);
-  }
-  if (
-  for (int i = (HALF_MAX_KEYS); i < MAX_KEYS; ++i) {
-    new_node->keys_[i - HALF_MAX_KEYS] = keys_[i];
-    if (is_leaf_) {
-      new_node->values_[i - HALF_MAX_KEYS] = values_[i];
-    } else {
+    memcpy(&new_node->keys_[0], &keys_[HALF_MAX_KEYS], sizeof(int) * HALF_MAX_KEYS);
+    for (int i = (HALF_MAX_KEYS); i < MAX_KEYS; ++i) {
       children_[i]->parent_ = new_node;
-      new_node->children_[i -HALF_MAX_KEYS] = children_[i];
     }
+    memcpy(&new_node->children_[0], &children_[HALF_MAX_KEYS], sizeof(Node*) * HALF_MAX_KEYS);
   }
-
+  
   keys_.resize(HALF_MAX_KEYS);
   if (is_leaf_) {
     values_.resize(HALF_MAX_KEYS);
