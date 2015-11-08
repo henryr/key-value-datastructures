@@ -16,6 +16,7 @@ class Node {
   vector<int> values_;
   Node* parent_;
   BTree* btree_;
+  int height_;
 
   void Check() {
     return;
@@ -35,7 +36,7 @@ class Node {
 
   bool is_leaf() const { return is_leaf_; }
 
-  Node(BTree* btree) : parent_(NULL), btree_(btree), is_leaf_(false) { }
+  Node(BTree* btree) : parent_(NULL), btree_(btree), is_leaf_(false), height_(0) { }
   void Split();
   Node* MakeSplittedNode();
 
@@ -47,11 +48,13 @@ class Node {
 class BTree {
  public:
   Node* root_;
+  int num_nodes_;
+  int num_find_loops_;
 
   int Find(int key);
   void Insert(int key, int value);
   void Delete(int key);
-
+  int height() const { return root_->height_; }
   BTree();
 
  private:
@@ -61,17 +64,42 @@ class BTree {
 BTree::BTree() {
   root_ = new Node(this);
   root_->SetIsLeaf(true);
+  num_nodes_ = 0;
 }
-
 
 int BTree::Find(int key) {
   Node* leaf = FindLeaf(key, true);
-  for (int i = 0; i < leaf->keys_.size(); ++i) {
-    if (leaf->keys_[i] == key) return leaf->values_[i];
-    if (leaf->keys_[i] > key) return -1;
-  }
+  int size = leaf->keys_.size();
 
-  return -1;
+  int b = 0; int t = size - 1;
+
+  vector<int>* leaf_keys = &leaf->keys_;
+  vector<int>* leaf_values = &leaf->values_;  
+  while (true) {
+    ++num_find_loops_;
+    int l = (*leaf_keys)[b];
+    if (l >= key) {
+      return l == key ? (*leaf_values)[b] : -1;
+    }
+
+    int h = leaf->keys_[t];
+    if (h <= key) {
+      return h == key ? (*leaf_values)[t] : -1;
+    }
+
+    // up to here is blindingly fast
+
+    int mid = (b + t) / 2;
+    int mk = (*leaf_keys)[mid];
+    if (mk == key) return (*leaf_values)[mid];
+
+    if (mk < key) {
+      b = mid + 1;
+    } else {
+      t = mid;
+    }
+    if (t <= b) return -1;
+  }
 }
 
 Node* BTree::FindLeaf(int key, bool print_height) {
@@ -80,10 +108,11 @@ Node* BTree::FindLeaf(int key, bool print_height) {
   while (true) {
     if (cur->is_leaf()) return cur;
     bool found = false;
-    for (int i = 0; i < cur->keys_.size(); ++i) {
+    int size = cur->keys_.size();
+    for (int i = 0; i < size; ++i) {
       if (cur->keys_[i] >= key) {
         cur = cur->children_[i];
-        ++height;
+        // ++height;
         found = true;
         break;
       }
@@ -122,16 +151,12 @@ void BTree::Insert(int key, int value) {
 
 void Node::Split() {
   if (keys_.size() < MAX_KEYS) return;
-  // cout << "Splitting node from " << keys_[0] << " -> " << keys_.back() << endl;
   Node* new_node = MakeSplittedNode();
-  // cout << "After split, left node ends at " << keys_.back()
-  //      << ", right node begins at " << new_node->keys_[0] << ", and ends at "
-  //      << new_node->keys_.back() << endl;
-  // cout << endl;
+  ++btree_->num_nodes_;
   if (parent_ == NULL) {
-    // DCHECK(btree_->root_ == this)
     Node* root = new Node(btree_);
     root->SetIsLeaf(false);
+    root->height_ = height_ + 1;
     root->keys_.push_back(keys_.back());
     root->children_.push_back(this);
     root->keys_.push_back(new_node->keys_.back());
@@ -213,7 +238,7 @@ int main(int argv, char** argc) {
   BTree btree;
   int NUM_ENTRIES = 10000000;
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
-  for (int i = 0; i < NUM_ENTRIES; ++i) {
+  for (int i = 0; i < NUM_ENTRIES; i += 2) {
     btree.Insert(i, i);
   }
 
@@ -221,9 +246,11 @@ int main(int argv, char** argc) {
   duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
   cout << "Inserting " << NUM_ENTRIES << " elements took " << time_span.count() << "s, at rate of "
        << (NUM_ENTRIES / time_span.count()) << " elements/s" << endl;
+  cout << "BTree height is: " << btree.height() << endl;
+  cout << "BTree num nodes is: " << btree.num_nodes_ << endl;  
 
   t1 = high_resolution_clock::now();
-  for (int i = 0; i < NUM_ENTRIES; ++i) {
+  for (int i = 0; i < NUM_ENTRIES; i += 2) {
     int found = btree.Find(i);
     if (found == -1) cout << "Val: " << i << ", found: " << found << endl;
   }
@@ -231,4 +258,5 @@ int main(int argv, char** argc) {
   time_span = duration_cast<duration<double>>(t2 - t1);
   cout << "Searching for " << NUM_ENTRIES << " elements took " << time_span.count()
        << "s, at rate of " << (NUM_ENTRIES / time_span.count()) << " elements/s" << endl;
+  cout << "Num find loops: " << btree.num_find_loops_ << endl;
 }
