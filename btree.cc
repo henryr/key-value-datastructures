@@ -6,7 +6,7 @@
 using namespace std;
 using namespace std::chrono;
 
-const int MAX_KEYS = 1000; //64 * 1024 / 8;
+const int MAX_KEYS = 100; //64 * 1024 / 8;
 const int HALF_MAX_KEYS = MAX_KEYS / 2;
 class BTree;
 
@@ -53,7 +53,6 @@ class BTree {
  public:
   Node* root_;
   int num_nodes_;
-  int num_find_loops_;
   duration<double> total_time_find_leaf_;
 
   int Find(int key);
@@ -95,12 +94,11 @@ Node* BTree::FindLeaf(int key, int* idx) {
       cur = cur->children_.back();
       continue;
     }
-            
+
     // Now search until we find smallest element >= than key          
     int b = 0; int t = size - 1;
     int* keys = &cur->keys_[0];
     while (true) {
-      //      cout << "b: " << b << ", t: " << t << endl;
       if (b >= t) {
         if (cur->is_leaf()) {
           *idx = b;
@@ -110,8 +108,21 @@ Node* BTree::FindLeaf(int key, int* idx) {
         break;
       }
 
-      int l = keys[b];
-      if (l == key) {
+      if (t - b < 64) {
+        for (int i = b; i <= t; ++i) {
+          if (keys[i] >= key) {
+            if (cur->is_leaf()) {
+              *idx = i;
+              return cur;
+            }
+            cur = cur->children_[i];
+            break;
+          }
+        }
+        break;
+      }
+
+      if (keys[b] == key) {
         if (cur->is_leaf()) {
           *idx = b;
           return cur;
@@ -120,8 +131,7 @@ Node* BTree::FindLeaf(int key, int* idx) {
         break;
       }        
         
-      int h = keys[t];
-      if (h == key) {
+      if (keys[t] == key) {
         if (cur->is_leaf()) {
           *idx = t;
           return cur;
@@ -131,10 +141,16 @@ Node* BTree::FindLeaf(int key, int* idx) {
       }
 
       int mid = (b + t) / 2;
-      int mk = keys[mid];
-      // if (mk == key) return (*leaf_values)[mid];
+      if (keys[mid] == key) {
+        if (cur->is_leaf()) {
+          *idx = mid;
+          return cur;
+        }
+        cur = cur->children_[mid];
+        break;
+      }
 
-      if (mk < key) {
+      if (keys[mid] < key) {
         b = mid + 1;
       } else {
         t = mid;
@@ -144,11 +160,11 @@ Node* BTree::FindLeaf(int key, int* idx) {
 }
 
 void BTree::Insert(int key, int value) {  
-  high_resolution_clock::time_point t1 = high_resolution_clock::now();
+  //high_resolution_clock::time_point t1 = high_resolution_clock::now();
   int idx;
   Node* node = FindLeaf(key, &idx);
-  high_resolution_clock::time_point t2 = high_resolution_clock::now();
-  total_time_find_leaf_ += duration_cast<duration<double>>(t2 - t1);
+  //high_resolution_clock::time_point t2 = high_resolution_clock::now();
+  //total_time_find_leaf_ += duration_cast<duration<double>>(t2 - t1);
 
   vector<int>::iterator keys_it = node->keys_.begin();
   vector<int>::iterator val_it = node->values_.begin();
@@ -223,6 +239,7 @@ Node* Node::MakeSplittedNode() {
   } else {
     new_node->children_.resize(HALF_MAX_KEYS);
   }
+  if (
   for (int i = (HALF_MAX_KEYS); i < MAX_KEYS; ++i) {
     new_node->keys_[i - HALF_MAX_KEYS] = keys_[i];
     if (is_leaf_) {
@@ -252,9 +269,15 @@ int main(int argv, char** argc) {
   using namespace std::chrono;
   BTree btree;
   int NUM_ENTRIES = 10000000;
-  high_resolution_clock::time_point t1 = high_resolution_clock::now();
+  vector<int> entries(NUM_ENTRIES);
+  for (int i = 0; i < NUM_ENTRIES; ++i) {
+    entries[i] = i;
+  }
+  random_shuffle(entries.begin(), entries.end());
+  high_resolution_clock::time_point t1 = high_resolution_clock::now();  
   for (int i = 0; i < NUM_ENTRIES; i += 1) {
-    btree.Insert(i, i);
+    // cout << "Inserting: " << entries[i] << endl;
+    btree.Insert(entries[i], entries[i]);
   }
 
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
@@ -270,12 +293,11 @@ int main(int argv, char** argc) {
 
   t1 = high_resolution_clock::now();
   for (int i = 0; i < NUM_ENTRIES; i += 1) {
-    int found = btree.Find(i);
+    int found = btree.Find(entries[i]);
     if (found == -1) cout << "Val: " << i << ", found: " << found << endl;
   }
   t2 = high_resolution_clock::now();
   time_span = duration_cast<duration<double>>(t2 - t1);
   cout << "Searching for " << NUM_ENTRIES << " elements took " << time_span.count()
        << "s, at rate of " << (NUM_ENTRIES / time_span.count()) << " elements/s" << endl;
-  cout << "Num find loops: " << btree.num_find_loops_ << endl;
 }
