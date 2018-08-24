@@ -7,3 +7,4 @@ link_directories(${CMAKE_SOURCE_DIR}/thirdparty/gtest-1.7.0/)
 
 add_executable(btree-test btree.cc)
 target_link_libraries(btree-test gtest pthread)
+target_compile_options(btree-test PRIVATE -g)
