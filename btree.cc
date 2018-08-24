@@ -7,13 +7,12 @@ using namespace std;
 
 const int MAX_KEYS = 100; //64 * 1024 / 8;
 const int HALF_MAX_KEYS = MAX_KEYS / 2;
-class BTree;
 
-template<typename T>
+template <typename T>
 class FastVector {
  public:
   FastVector(int capacity) : size_(0), capacity_(capacity) {
-    values_ = new T[capacity];    
+    values_ = new T[capacity];
   }
 
   void PushBack(const T& val) {
@@ -49,15 +48,17 @@ class Node;
 typedef FastVector<int> IntVector;
 typedef FastVector<Node*> NodeVector;
 
+class BTree;
+
 class Node {
  public:
   IntVector keys_;
   NodeVector children_;
-  IntVector values_;  
+  IntVector values_;
   BTree* btree_;
 
   Node* parent() const { return parent_; }
-  
+
 
   inline bool is_leaf() const { return is_leaf_; }
   int height() const { return height_; }
@@ -68,9 +69,9 @@ class Node {
                                      parent_(NULL),
                                      btree_(btree),
                                      is_leaf_(is_leaf),
-                                     height_(0) {    
+                                     height_(0) {
   }
-  
+
   void Split();
  private:
   bool is_leaf_;
@@ -89,7 +90,7 @@ class BTree {
 
   int num_nodes_;
   Node* root_;
-  
+
  private:
   Node* FindLeaf(int key, int* idx);
 };
@@ -103,7 +104,7 @@ int BTree::Find(int key) {
   int idx;
   Node* leaf = FindLeaf(key, &idx);
   if (leaf->keys_[idx] == key) return leaf->values_[idx];
-  return -1;  
+  return -1;
 }
 
 Node* BTree::FindLeaf(int key, int* idx) {
@@ -117,12 +118,12 @@ Node* BTree::FindLeaf(int key, int* idx) {
         *idx = size;
         return cur;
       }
-      cur->keys_[cur->keys_.size() - 1] = numeric_limits<int>::max();
+      cur->keys_[cur->keys_.size() - 1] = key + 1; //numeric_limits<int>::max();
       cur = cur->children_.back();
       continue;
     }
 
-    // Now search until we find smallest element >= than key          
+    // Now search until we find smallest element >= than key
     int b = 0; int t = size - 1;
     int* keys = cur->keys_.values();
     while (true) {
@@ -156,8 +157,8 @@ Node* BTree::FindLeaf(int key, int* idx) {
         }
         cur = cur->children_[b];
         break;
-      }        
-        
+      }
+
       if (keys[t] == key) {
         if (cur->is_leaf()) {
           *idx = t;
@@ -183,7 +184,7 @@ Node* BTree::FindLeaf(int key, int* idx) {
         t = mid;
       }
     }
-  }    
+  }
 }
 
 void BTree::Insert(int key, int value) {
@@ -235,7 +236,7 @@ void Node::Split() {
     }
   }
 
-  if (!found) { 
+  if (!found) {
     parent_->keys_.PushBack(key);
     parent_->children_.PushBack(new_node);
   }
@@ -259,7 +260,7 @@ Node* Node::MakeSplittedNode() {
     }
     memcpy(&new_node->children_[0], &children_[HALF_MAX_KEYS], sizeof(Node*) * HALF_MAX_KEYS);
   }
-  
+
   keys_.Resize(HALF_MAX_KEYS);
   if (is_leaf_) {
     values_.Resize(HALF_MAX_KEYS);
@@ -274,20 +275,20 @@ Node* Node::MakeSplittedNode() {
 int main(int argv, char** argc) {
   using namespace std::chrono;
   BTree btree;
-  int NUM_ENTRIES = 50000000;
+  int NUM_ENTRIES = 10000000;
   vector<int> entries(NUM_ENTRIES);
   for (int i = 0; i < NUM_ENTRIES; ++i) {
     entries[i] = i;
   }
   random_shuffle(entries.begin(), entries.end());
-  high_resolution_clock::time_point t1 = high_resolution_clock::now();  
+  high_resolution_clock::time_point t1 = high_resolution_clock::now();
   for (int i = 0; i < NUM_ENTRIES; ++i) {
     btree.Insert(entries[i], entries[i]);
   }
 
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
   duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
-  
+
   cout << "Inserting " << NUM_ENTRIES << " elements took " << time_span.count() << "s, at rate of "
        << (NUM_ENTRIES / time_span.count()) << " elements/s" << endl;
   cout << "BTree height is: " << btree.height() << endl;
