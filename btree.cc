@@ -215,8 +215,8 @@ Node* Node::MakeSplittedNode(int* median_key) {
     memcpy(&new_node->keys_[0], &keys_[median_idx + 1], sizeof(int) * new_node->keys_.size());
     memcpy(&new_node->values_[0], &values_[median_idx + 1], sizeof(int) * new_node->values_.size());
 
-    keys_.Resize(half_keys);
-    values_.Resize(half_keys);
+    keys_.Resize(half_keys + 1);
+    values_.Resize(half_keys + 1);
 
     assert(keys_.size() == values_.size());
     assert(new_node->keys_.size() == new_node->values_.size());
