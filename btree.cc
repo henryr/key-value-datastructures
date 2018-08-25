@@ -190,33 +190,63 @@ Node* Node::MakeSplittedNode(int* median_key) {
   new_node->parent_ = parent_;
 
   if (!is_leaf()) {
+    // If:
+    // a) keys_.size() is odd, say 9, then: median_idx = 4 (0,1,2,3 and 5,6,7,8 on lhs and ths)
+    //    num_keys_rhs should be 4
+    //    the rhs child should have one more link than key
+    //    num_keys_rhs should also be 4
+    //
+    // b) keys_.size() is even, say 8, then:
+    //    median_idx should be 4 (0,1,2,3 on lhs, 5,6,7 on rhs)
+    //    num_keys_rhs is *3*.
+    //    num_keys_lhs is 4
+    //
+    //    so:
+    //    median_idx = keys_.size() >> 1
+    //    num_keys_rhs = keys_.size() - (median_idx + 1) // 8 -> 3, 9 -> 4, 10 -> 4, etc
     int half_keys = keys_.size() >> 1;
-    int median_idx = 1 + half_keys;
+    int median_idx = half_keys;
+    int num_keys_rhs = keys_.size() - (median_idx + 1);
     *median_key = keys_[median_idx];
-    new_node->children_.Resize(half_keys + 1); // One more link than key
-    new_node->keys_.Resize(keys_.size() - (median_idx + 1));
+    new_node->children_.Resize(num_keys_rhs + 1); // One more link than key
+    //assert(half_keys == keys_.size() - (median_idx + 1));
+    new_node->keys_.Resize(num_keys_rhs);
 
     memcpy(&new_node->keys_[0], &keys_[median_idx + 1], sizeof(int) * new_node->keys_.size());
     memcpy(&new_node->children_[0], &children_[median_idx], sizeof(Node*) * new_node->children_.size());
 
-    for (int i = 0; i < new_node->children_.size(); ++i) new_node->children_[i]->parent_ = new_node;
+    for (int i = 0; i < new_node->children_.size(); ++i) {
+      if (!new_node->children_[i]) continue;
+      new_node->children_[i]->parent_ = new_node;
+    }
     keys_.Resize(half_keys);
-    values_.Resize(half_keys);
   } else {
-    // Leaf node
-    int half_keys = keys_.size() >> 1;
-    int median_idx = half_keys;
+    // If:
+    // a) keys_.size() is odd, say 9, then:
+    //    median_idx = 4
+    //    num_keys_rhs = median_idx (4)
+    //    num_keys_lhs = median_idx + 1 (5)
+    //
+    // b) keys_.size() is even, say 8, then:
+    //    median_idx = is 4
+    //    num_keys_rhs = 4 (4,5,6,7)
+    //    num_keys_lhs = 4 (0,1,2,3)
+    //
+    //  so num_keys_rhs = median_idx + (keys_.size() & 1)
+    int median_idx = keys_.size() >> 1;
     *median_key = keys_[median_idx];
 
     //
-    int num_keys_in_rhs = keys_.size() - (half_keys + 1);
-    new_node->values_.Resize(num_keys_in_rhs);
-    new_node->keys_.Resize(num_keys_in_rhs);
-    memcpy(&new_node->keys_[0], &keys_[median_idx + 1], sizeof(int) * new_node->keys_.size());
-    memcpy(&new_node->values_[0], &values_[median_idx + 1], sizeof(int) * new_node->values_.size());
+    int num_keys_rhs = median_idx;
+    new_node->values_.Resize(num_keys_rhs);
+    new_node->keys_.Resize(num_keys_rhs);
 
-    keys_.Resize(half_keys + 1);
-    values_.Resize(half_keys + 1);
+    int copy_from_idx = median_idx + (keys_.size() & 1);
+    memcpy(&new_node->keys_[0], &keys_[copy_from_idx], sizeof(int) * new_node->keys_.size());
+    memcpy(&new_node->values_[0], &values_[copy_from_idx], sizeof(int) * new_node->values_.size());
+
+    keys_.Resize(median_idx + (keys_.size() & 1));
+    values_.Resize(keys_.size());
 
     assert(keys_.size() == values_.size());
     assert(new_node->keys_.size() == new_node->values_.size());

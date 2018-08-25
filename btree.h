@@ -84,6 +84,10 @@ class Node {
   // For testing
   Node(const IntVector& keys, const IntVector& values) : is_leaf_(true), keys_(keys), values_(values) { }
 
+  Node(const IntVector& keys, const NodeVector& links) : is_leaf_(false), keys_(keys), children_(links) {
+    assert(keys_.size() == children_.size() - 1);
+  }
+
   void Split();
 
   void InsertKeyValue(int idx, int key, int value) {
