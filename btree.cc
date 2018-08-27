@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <vector>
+#include <stack>
 #include <iostream>
 #include <chrono>
 
@@ -7,14 +8,15 @@
 
 using namespace std;
 
-BTree::BTree() {
+BTree::BTree(int max_leaf_keys, int max_interior_keys) : MAX_LEAF_KEYS(max_leaf_keys), MAX_INTERIOR_KEYS(max_interior_keys) {
+  // TODO don't do this, just detect it on first insert or search
   root_ = new Node(this, true);
 }
 
 int BTree::Find(int key) {
   int idx;
   Node* leaf = FindLeaf(key, &idx);
-  if (idx == -1 || leaf->key_at(idx) != key) return -1;
+  if (leaf->key_at(idx) != key) return -1;
   return leaf->value_at(idx);
 }
 
@@ -27,118 +29,107 @@ Node* BTree::FindLeaf(int key, int* idx) {
       *idx = next_idx;
       return cur;
     }
-
-    cur = cur->child_at(next_idx);
+    assert(!cur->is_leaf());
+    Node* nxt = cur->child_at(next_idx);
+    cur = nxt;
   }
 }
 
 int Node::FindKeyIdx(int key) {
+  if (keys_.size() == 0) return 0;
   // For now, linear search
   for (int i = 0; i < keys_.size(); ++i) {
     if (keys_[i] >= key) return i;
   }
 
-  // Return the index of the last link, which is one more than the index of the last key.
-  return is_leaf() ? keys_.size() : -1;
+  return keys_.size();
 }
 
-  // while (true) {
-//     int size = cur->keys_.size();
-//     if (cur->key_at(size - 1) < key) {
-//       // value > the largest value in the tree. We can add it to the rightmost leaf, and
-//       // rewrite the index.
-//       if (cur->is_leaf()) {
-//         *idx = size;
-//         return cur;
-//       }
-//       cur->update_key(size - 1, key + 1);
-//       cur = cur->rightmost_child();
-//       continue;
-//     }
-
-//     // Now search until we find smallest element >= than key
-//     int b = 0; int t = size - 1;
-//     // int* keys = cur->keys_.values();
-//     while (true) {
-//       if (b >= t) {
-//         if (cur->is_leaf()) {
-//           *idx = b;
-//           return cur;
-//         }
-//         cur = cur->children_[b];
-//         break;
-//       }
-
-//       if (t - b < 16) {
-//         for (int i = b; i <= t; ++i) {
-//           if (cur->key_at(i) >= key) {
-//             if (cur->is_leaf()) {
-//               *idx = i;
-//               return cur;
-//             }
-//             cur = cur->children_[i];
-//             break;
-//           }
-//         }
-//         break;
-//       }
-
-//       if (cur->key_at(b) == key) {
-//         if (cur->is_leaf()) {
-//           *idx = b;
-//           return cur;
-//         }
-//         cur = cur->children_[b];
-//         break;
-//       }
-
-//       if (cur->key_at(t) == key) {
-//         if (cur->is_leaf()) {
-//           *idx = t;
-//           return cur;
-//         }
-//         cur = cur->children_[t];
-//         break;
-//       }
-
-//       int mid = (b + t) / 2;
-//       if (cur->key_at(mid) == key) {
-//         if (cur->is_leaf()) {
-//           *idx = mid;
-//           return cur;
-//         }
-//         cur = cur->children_[mid];
-//         break;
-//       }
-
-//       if (cur->key_at(mid) < key) {
-//         b = mid + 1;
-//       } else {
-//         t = mid;
-//       }
-//     }
-//   }
-// }
-
 void BTree::Insert(int key, int value) {
+  CheckSelf();
   int idx;
   Node* node = FindLeaf(key, &idx);
   node->InsertKeyValue(idx, key, value);
   node->Split();
+  CheckSelf();
+}
+
+void BTree::CheckSelf() {
+  if (!root_) return;
+  stack<Node*> to_check;
+  to_check.push(root_);
+  while (!to_check.empty()) {
+    Node* cur = to_check.top();
+    to_check.pop();
+
+    cur->CheckSelf();
+    if (!cur->is_leaf()) {
+      for (int i = 0; i < cur->num_children(); ++i) {
+        to_check.push(cur->child_at(i));
+      }
+    }
+  }
+}
+
+Node::Node(BTree* btree, bool is_leaf) : keys_(1 + (is_leaf ? btree->MAX_LEAF_KEYS : btree->MAX_INTERIOR_KEYS)),
+                                   children_(is_leaf ? 0 : btree->MAX_INTERIOR_KEYS + 2),
+                                   values_(is_leaf ? 1 + btree->MAX_LEAF_KEYS : 0),
+                                   btree_(btree),
+                                   is_leaf_(is_leaf) {
+  // Interior nodes have N keys and N + 1 links to the next level.
+  // Leaves have N keys and N corresponding values.
+}
+
+void Node::CheckSelf() {
+  bool is_root = parent_ == nullptr;
+  if (!is_leaf()) {
+    if (!is_root) {
+      assert(num_keys() >= (btree_->MAX_INTERIOR_KEYS / 2) - 1);
+      assert(num_keys() < btree_->MAX_INTERIOR_KEYS);
+    }
+    assert(num_children() == num_keys() + 1);
+  } else {
+    assert(num_keys() == num_values());
+  }
+
+  for (int i = 1; i < num_keys(); ++i) {
+    assert(key_at(i) > key_at(i - 1));
+  }
+}
+
+void Node::InsertKeyPointer(int idx, int key, Node* ptr) {
+  assert(!is_leaf());
+  if (idx != keys_.size()) {
+    keys_.Insert(idx, key);
+    children_.Insert(idx, ptr);
+  } else {
+    keys_.PushBack(key);
+    children_.PushBack(ptr);
+  }
+}
+
+void Node::InsertKeyValue(int idx, int key, int value) {
+  assert(is_leaf());
+  if (idx != keys_.size()) {
+    keys_.Insert(idx, key);
+    values_.Insert(idx, value);
+  } else {
+    keys_.PushBack(key);
+    values_.PushBack(value);
+  }
 }
 
 void Node::Split() {
   // TODO: Move some logic to BTree
-  if (keys_.size() < (is_leaf() ? MAX_LEAF_KEYS : MAX_INTERIOR_KEYS)) return;
+  if (keys_.size() < (is_leaf() ? btree_->MAX_LEAF_KEYS : btree_->MAX_INTERIOR_KEYS)) return;
   int median;
   Node* new_node = MakeSplittedNode(&median);
   ++btree_->num_nodes_;
   if (!parent_) {
     Node* root = new Node(btree_, false);
     root->height_ = height_ + 1;
-    root->keys_.PushBack(keys_.back());
+    root->keys_.PushBack(median);
     root->children_.PushBack(this);
-    root->keys_.PushBack(new_node->keys_.back());
     root->children_.PushBack(new_node);
 
     new_node->parent_ = root;
@@ -148,26 +139,8 @@ void Node::Split() {
     return;
   }
 
-  // Otherwise parent gets both
-  // push_back into parent keys / values
-  int key = new_node->keys_.back();
-  bool found = false;
-  for (int i = 0; i < parent_->keys_.size(); ++i) {
-    if (parent_->children_[i] == this) {
-      parent_->keys_[i] = keys_.back();
-    } else if (parent_->keys_[i] >= key) {
-      parent_->keys_.Insert(i, key);
-      parent_->children_.Insert(i, new_node);
-      found = true;
-      break;
-    }
-  }
-
-  if (!found) {
-    parent_->keys_.PushBack(key);
-    parent_->children_.PushBack(new_node);
-  }
-
+  int idx = parent_->FindKeyIdx(median);
+  parent_->InsertKeyPointer(idx, median, new_node);
   parent_->Split();
 }
 
@@ -204,22 +177,21 @@ Node* Node::MakeSplittedNode(int* median_key) {
     //    so:
     //    median_idx = keys_.size() >> 1
     //    num_keys_rhs = keys_.size() - (median_idx + 1) // 8 -> 3, 9 -> 4, 10 -> 4, etc
-    int half_keys = keys_.size() >> 1;
-    int median_idx = half_keys;
+    int median_idx = keys_.size() >> 1;
     int num_keys_rhs = keys_.size() - (median_idx + 1);
     *median_key = keys_[median_idx];
     new_node->children_.Resize(num_keys_rhs + 1); // One more link than key
-    //assert(half_keys == keys_.size() - (median_idx + 1));
     new_node->keys_.Resize(num_keys_rhs);
 
     memcpy(&new_node->keys_[0], &keys_[median_idx + 1], sizeof(int) * new_node->keys_.size());
-    memcpy(&new_node->children_[0], &children_[median_idx], sizeof(Node*) * new_node->children_.size());
+    memcpy(&new_node->children_[0], &children_[median_idx + 1], sizeof(Node*) * new_node->children_.size());
 
     for (int i = 0; i < new_node->children_.size(); ++i) {
       if (!new_node->children_[i]) continue;
       new_node->children_[i]->parent_ = new_node;
     }
-    keys_.Resize(half_keys);
+    keys_.Resize(median_idx);
+    children_.Resize(median_idx + 1);
   } else {
     // If:
     // a) keys_.size() is odd, say 9, then:
@@ -228,20 +200,20 @@ Node* Node::MakeSplittedNode(int* median_key) {
     //    num_keys_lhs = median_idx + 1 (5)
     //
     // b) keys_.size() is even, say 8, then:
-    //    median_idx = is 4
+    //    median_idx = is 3
     //    num_keys_rhs = 4 (4,5,6,7)
     //    num_keys_lhs = 4 (0,1,2,3)
     //
     //  so num_keys_rhs = median_idx + (keys_.size() & 1)
-    int median_idx = keys_.size() >> 1;
+    int median_idx = (keys_.size() >> 1) - !(keys_.size() & 1);
     *median_key = keys_[median_idx];
 
     //
-    int num_keys_rhs = median_idx;
+    int num_keys_rhs = keys_.size() >> 1;
     new_node->values_.Resize(num_keys_rhs);
     new_node->keys_.Resize(num_keys_rhs);
 
-    int copy_from_idx = median_idx + (keys_.size() & 1);
+    int copy_from_idx = median_idx + 1; //(keys_.size() & 1);
     memcpy(&new_node->keys_[0], &keys_[copy_from_idx], sizeof(int) * new_node->keys_.size());
     memcpy(&new_node->values_[0], &values_[copy_from_idx], sizeof(int) * new_node->values_.size());
 
@@ -254,37 +226,3 @@ Node* Node::MakeSplittedNode(int* median_key) {
 
   return new_node;
 }
-
-
-// int main(int argv, char** argc) {
-//   using namespace std::chrono;
-//   BTree btree;
-//   int NUM_ENTRIES = 10000000;
-//   vector<int> entries(NUM_ENTRIES);
-//   for (int i = 0; i < NUM_ENTRIES; ++i) {
-//     entries[i] = i;
-//   }
-//   random_shuffle(entries.begin(), entries.end());
-//   high_resolution_clock::time_point t1 = high_resolution_clock::now();
-//   for (int i = 0; i < NUM_ENTRIES; ++i) {
-//     btree.Insert(entries[i], entries[i]);
-//   }
-
-//   high_resolution_clock::time_point t2 = high_resolution_clock::now();
-//   duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
-
-//   cout << "Inserting " << NUM_ENTRIES << " elements took " << time_span.count() << "s, at rate of "
-//        << (NUM_ENTRIES / time_span.count()) << " elements/s" << endl;
-//   cout << "BTree height is: " << btree.height() << endl;
-//   cout << "BTree num nodes is: " << btree.num_nodes_ << endl;
-
-//   t1 = high_resolution_clock::now();
-//   for (int i = 0; i < NUM_ENTRIES; i += 1) {
-//     int found = btree.Find(entries[i]);
-//     if (found == -1) cout << "Val: " << entries[i] << ", found: " << found << endl;
-//   }
-//   t2 = high_resolution_clock::now();
-//   time_span = duration_cast<duration<double>>(t2 - t1);
-//   cout << "Searching for " << NUM_ENTRIES << " elements took " << time_span.count()
-//        << "s, at rate of " << (NUM_ENTRIES / time_span.count()) << " elements/s" << endl;
-// }
