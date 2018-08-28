@@ -178,76 +178,42 @@ int Node::Split() {
 }
 
 Node* Node::MakeSplittedNode(int* pivot_key) {
-  // TODO: these are slightly outdated.
-  // Steps for splitting an interior node:
-  // 1. pick a pivot. This value will be inserted into the parent.
-  // 2. create a new node with floor(keys.size() / 2) keys.
-  // 3. copy all keys from keys_[pivot_idx + 1] .. keys_.size() into new node
-  // 4. copy all children pointers from children_[pivot_idx + 1] .. childen_.size() into new node
-  // 5. Resize keys_ to keys_.size() / 2. Resize children_ to 1 + children_.size() / 2
-  //
-  // For a leaf node:
-  // 1. pick a pivot. This value will be inserted into the parent.
-  // 2. Create a new node with floor(keys.size() / 2) keys and children.
-  // 3. Copy all keys from keys_[pivot_idx + 1] .. keys_.size() into new node
-  // 4. copy all values from keys_[pivot_idx + 1] .. children.size() into new node
-  // 5. Resize keys_ to pivot_idx. Resize children_ to pivot_idx.
-
+  // Split a node by partitioning it into two halves around a 'pivot' key. The pivot key is returned
+  // to ultimately be inserted into the parent.  The new node created by splitting is the right-hand
+  // successor of this node, and contains all keys larger than the pivot key.
   Node* new_node = new Node(btree_, is_leaf_);
   new_node->parent_ = parent_;
 
-  if (!is_leaf()) {
-    // If:
-    // a) keys_.size() is odd, say 9, then: pivot_idx = 4 (0,1,2,3 and 5,6,7,8 on lhs and ths)
-    //    num_keys_rhs should be 4
-    //    the rhs child should have one more link than key
-    //    num_keys_rhs should also be 4
-    //
-    // b) keys_.size() is even, say 8, then:
-    //    pivot_idx should be 4 (0,1,2,3 on lhs, 5,6,7 on rhs)
-    //    num_keys_rhs is *3*.
-    //    num_keys_lhs is 4
-    //
-    //    so:
-    //    pivot_idx = keys_.size() >> 1
-    //    num_keys_rhs = keys_.size() - (pivot_idx + 1) // 8 -> 3, 9 -> 4, 10 -> 4, etc
-    int pivot_idx = keys_.size() >> 1;
-    int num_keys_rhs = keys_.size() - (pivot_idx + 1);
-    *pivot_key = keys_[pivot_idx];
-    new_node->children_.Resize(num_keys_rhs + 1); // One more link than key
-    new_node->keys_.Resize(num_keys_rhs);
+  // We need to be sure that the value for the pivot key belongs to the LHS.
+  // So if #keys is odd, the pivot is the 'middle' key (e.g. in 4,5,6,7,8 the pivot is 6)
+  //    if #keys is even, the pivot is the rightmost key in the left half. (e.g. in 4,5,6,7 the
+  //    pivot is 5)
+  //    in the odd case, the LHS gets one more key than the RHS.
+  // way to compute this is to take the integer floor of (keys_.size() - 1) / 2.
+  // int pivot_idx = (keys_.size() - 1) >> 1;
+  int pivot_idx = (keys_.size() - 1) >> 1;
+  *pivot_key = keys_[pivot_idx];
 
-    memcpy(&new_node->keys_[0], &keys_[pivot_idx + 1], sizeof(int) * new_node->keys_.size());
-    memcpy(&new_node->children_[0], &children_[pivot_idx + 1], sizeof(Node*) * new_node->children_.size());
+  int num_keys_rhs = keys_.size() >> 1;
+  new_node->keys_.Resize(num_keys_rhs);
+  memcpy(&new_node->keys_[0], &keys_[pivot_idx + 1], sizeof(int) * new_node->keys_.size());
+
+  // If we're a leaf we 'keep' the key being pushed to the parent.
+  keys_.Resize(pivot_idx + (is_leaf() ? 1 : 0));
+
+  if (!is_leaf()) {
+    new_node->children_.Resize(num_keys_rhs + 1); // One more link than key
+    memcpy(&new_node->children_[0], &children_[pivot_idx + 1], sizeof(Node*) * (num_keys_rhs + 1));
 
     for (int i = 0; i < new_node->children_.size(); ++i) {
       if (!new_node->children_[i]) continue;
       new_node->children_[i]->parent_ = new_node;
     }
-    keys_.Resize(pivot_idx);
     children_.Resize(pivot_idx + 1);
   } else {
-    // We need to be sure that the value for the pivot key belongs to the LHS.
-    // So if #keys is odd, the pivot is the 'middle' key (e.g. in 4,5,6,7,8 the pivot is 6)
-    //    if #keys is even, the pivot is the rightmost key in the left half. (e.g. in 4,5,6,7 the
-    //    pivot is 5)
-    //    in the odd case, the LHS gets one more key than the RHS.
-    // way to compute this is to take the integer floor of (keys_.size() - 1) / 2.
-    int pivot_idx = (keys_.size() - 1) >> 1;
-    *pivot_key = keys_[pivot_idx];
-
-    int num_keys_rhs = keys_.size() >> 1;
     new_node->values_.Resize(num_keys_rhs);
-    new_node->keys_.Resize(num_keys_rhs);
-
-    memcpy(&new_node->keys_[0], &keys_[pivot_idx + 1], sizeof(int) * new_node->keys_.size());
-    memcpy(&new_node->values_[0], &values_[pivot_idx + 1], sizeof(int) * new_node->values_.size());
-
-    keys_.Resize(pivot_idx + 1);
+    memcpy(&new_node->values_[0], &values_[pivot_idx + 1], sizeof(int) * num_keys_rhs);
     values_.Resize(keys_.size());
-
-    assert(keys_.size() == values_.size());
-    assert(new_node->keys_.size() == new_node->values_.size());
   }
 
   return new_node;

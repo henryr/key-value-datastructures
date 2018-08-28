@@ -50,12 +50,12 @@ TEST(BTree, MakeSplittedNode) {
 
     int median = -1;
     unique_ptr<Node> new_node(node.MakeSplittedNode(&median));
-    ASSERT_EQ(3, median);
+    ASSERT_EQ(2, median);
 
     ASSERT_EQ(1, node.key_at(0));
-    ASSERT_EQ(2, node.key_at(1));
 
-    ASSERT_EQ(4, new_node->key_at(0));
+    ASSERT_EQ(3, new_node->key_at(0));
+    ASSERT_EQ(4, new_node->key_at(1));
   }
 }
 
@@ -146,7 +146,7 @@ TEST(BTree, Insert) {
 
 int main(int argc, char **argv) {
       ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+  return RUN_ALL_TESTS();
 
   //  int main(int argv, char** argc) {
   using namespace std::chrono;
