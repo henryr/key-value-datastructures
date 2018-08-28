@@ -17,9 +17,9 @@
 // 2. DONE - Figure out whether we need FastVector
 // 3. Implement Delete()
 // 4. Experiment with top-down splitting.
-// 5. Clean up MakeSplittedNode()
+// 5. DONE - Clean up MakeSplittedNode()
 // 6. Add support for strings as keys
-// 7. Fix up InsertKeyPointer(before / after) mess
+// 7. DONE - Fix up InsertKeyPointer(before / after) mess
 
 #include <vector>
 #include "gtest/gtest.h"
@@ -60,10 +60,9 @@ class Node {
   // Inserts a key into a leaf at index 'idx'
   void InsertKeyValue(int idx, int key, int value);
 
-  // Insert a pointer into an interior node at index 'idx'. If 'after' is true (which it usually
-  // is), 'ptr' is inserted after index, i.e. it is taken to be the pointer to the nodecontaining
-  // the keys that immediately follow 'key'.
-  void InsertKeyPointer(int idx, int key, Node* ptr, bool after);
+  // Insert a pointer into an interior node at index 'idx'. 'ptr' is inserted after index, i.e. it
+  // is taken to be the pointer to the node containing the keys that immediately follow 'key'.
+  void InsertKeyPointer(int idx, int key, Node* ptr);
 
   // Returns the index of 'key' in this node, whether it indexes a value (for a leaf) or a
   // link (for an interior node).

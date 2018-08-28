@@ -103,19 +103,21 @@ TEST(BTree, SplitUpTree) {
   BTree btree(5);
 
   Node root(&btree, false);
-  vector<Node*> children;
   for (int i = 0; i < 4; ++i) {
     int s = i * 10;
     vector<int> keys = { s + 1, s + 2, s + 3, s + 4 };
     Node* n = new Node(&btree, keys, keys);
-    root.InsertKeyPointer(i, (i + 1) * 10, n, false);
+
+    root.keys_.Insert(i, (i + 1) * 10);
+    root.children_.Insert(i, n);
+    n->parent_ = &root;
   }
   vector<int> final_keys = { 50, 55, 60 };
   root.children_.PushBack(new Node(&btree, final_keys, final_keys));
-
   btree.SetRoot(&root);
 
   btree.Insert(7, 7);
+
   // Expect root just to have one key because it is newly created after a split.
   ASSERT_EQ(1, btree.root()->num_keys());
   ASSERT_EQ(20, btree.root()->key_at(0));
@@ -158,10 +160,7 @@ int main(int argc, char **argv) {
   }
   random_shuffle(entries.begin(), entries.end());
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
-  for (int i = 0; i < NUM_ENTRIES; ++i) {
-    //cout << "Inserting: " << entries[i] << endl;
-    btree.Insert(entries[i], entries[i]);
-  }
+  for (int i: entries) btree.Insert(i, i);
 
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
   duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
@@ -172,9 +171,9 @@ int main(int argc, char **argv) {
   cout << "BTree num nodes is: " << btree.num_nodes() << endl;
 
   t1 = high_resolution_clock::now();
-  for (int i = 0; i < NUM_ENTRIES; i += 1) {
-    int found = btree.Find(entries[i]);
-    if (found == -1) cout << "Val: " << entries[i] << ", found: " << found << endl;
+  for (int k: entries) {
+    int found = btree.Find(k);
+    if (found == -1) cout << "Val: " << k << ", found: " << found << endl;
   }
   t2 = high_resolution_clock::now();
   time_span = duration_cast<duration<double>>(t2 - t1);

@@ -132,10 +132,10 @@ void Node::CheckSelf() {
   }
 }
 
-void Node::InsertKeyPointer(int idx, int key, Node* ptr, bool after) {
+void Node::InsertKeyPointer(int idx, int key, Node* ptr) {
   assert(!is_leaf());
   keys_.Insert(idx, key);
-  children_.Insert(idx + (after ? 1 : 0), ptr);
+  children_.Insert(idx + 1, ptr);
 #ifdef SANITY_CHECK
   for (int i = 1; i < num_keys(); ++i) {
     assert(key_at(i) > key_at(i - 1));
@@ -173,7 +173,7 @@ int Node::Split() {
   }
 
   int idx = parent_->FindKeyIdx(pivot);
-  parent_->InsertKeyPointer(idx, pivot, new_node, true);
+  parent_->InsertKeyPointer(idx, pivot, new_node);
   return 1 + parent_->Split();
 }
 
