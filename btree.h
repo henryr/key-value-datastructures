@@ -54,6 +54,8 @@ class FastVector {
     return values_[idx];
   }
 
+  T operator[](int idx) const { return values_[idx]; }
+
  private:
   T* values_;
   int size_ = 0;
@@ -78,11 +80,8 @@ class Node {
   Node(BTree* btree, bool is_leaf);
 
   // For testing
-  Node(const IntVector& keys, const IntVector& values) : is_leaf_(true), keys_(keys), values_(values) { }
-
-  Node(const IntVector& keys, const NodeVector& links) : is_leaf_(false), keys_(keys), children_(links) {
-    assert(keys_.size() == children_.size() - 1);
-  }
+  Node(BTree* btree, const IntVector& keys, const IntVector& values);
+  Node(BTree* btree, const IntVector& keys, const NodeVector& links);
 
   void Split();
 
@@ -119,6 +118,7 @@ class Node {
 
   FRIEND_TEST(BTree, MakeSplittedNode);
   FRIEND_TEST(BTree, Split);
+  FRIEND_TEST(BTree, SplitUpTree);
 
   Node* MakeSplittedNode(int* median_key);
 };

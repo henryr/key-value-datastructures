@@ -71,6 +71,17 @@ void BTree::CheckSelf() {
   }
 }
 
+Node::Node(BTree* btree, const IntVector& keys, const IntVector& values) : is_leaf_(true), keys_(btree->MAX_LEAF_KEYS), values_(btree->MAX_LEAF_KEYS), btree_(btree) {
+  for (int i = 0; i < keys.size(); ++i) keys_.PushBack(keys[i]);
+  for (int i = 0; i < values.size(); ++i) values_.PushBack(values[i]);
+}
+
+Node::Node(BTree* btree, const IntVector& keys, const NodeVector& links) : is_leaf_(false), keys_(btree->MAX_INTERIOR_KEYS), children_(btree->MAX_INTERIOR_KEYS + 1), btree_(btree) {
+  for (int i = 0; i < keys.size(); ++i) keys_.PushBack(keys[i]);
+  for (int i = 0; i < links.size(); ++i) children_.PushBack(links[i]);
+  assert(keys_.size() == children_.size() - 1);
+}
+
 Node::Node(BTree* btree, bool is_leaf) : keys_(1 + (is_leaf ? btree->MAX_LEAF_KEYS : btree->MAX_INTERIOR_KEYS)),
                                    children_(is_leaf ? 0 : btree->MAX_INTERIOR_KEYS + 2),
                                    values_(is_leaf ? 1 + btree->MAX_LEAF_KEYS : 0),
@@ -106,6 +117,7 @@ void Node::InsertKeyPointer(int idx, int key, Node* ptr) {
     keys_.PushBack(key);
     children_.PushBack(ptr);
   }
+  ptr->parent_ = this;
 }
 
 void Node::InsertKeyValue(int idx, int key, int value) {
@@ -217,7 +229,7 @@ Node* Node::MakeSplittedNode(int* median_key) {
     memcpy(&new_node->keys_[0], &keys_[copy_from_idx], sizeof(int) * new_node->keys_.size());
     memcpy(&new_node->values_[0], &values_[copy_from_idx], sizeof(int) * new_node->values_.size());
 
-    keys_.Resize(median_idx + (keys_.size() & 1));
+    keys_.Resize(median_idx + 1);
     values_.Resize(keys_.size());
 
     assert(keys_.size() == values_.size());
