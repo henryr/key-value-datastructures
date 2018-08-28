@@ -46,12 +46,12 @@ int Node::FindKeyIdx(int key) {
 }
 
 void BTree::Insert(int key, int value) {
-  CheckSelf();
+  // CheckSelf();
   int idx;
   Node* node = FindLeaf(key, &idx);
   node->InsertKeyValue(idx, key, value);
   node->Split();
-  CheckSelf();
+  // CheckSelf();
 }
 
 void BTree::CheckSelf() {
