@@ -5,7 +5,7 @@ using namespace std;
 
 TEST(BTree, MakeSplittedNode) {
   {
-    BTree btree(4,4);
+    BTree btree(4);
     vector<int> keys = {1,2,3};
     Node node(&btree, keys, keys);
 
@@ -25,7 +25,7 @@ TEST(BTree, MakeSplittedNode) {
   }
 
   {
-    BTree btree(4,4);
+    BTree btree(4);
     vector<int> keys = {1,2,3,4};
     Node node(&btree, keys, keys);
 
@@ -43,7 +43,7 @@ TEST(BTree, MakeSplittedNode) {
   }
 
   {
-    BTree btree(4,4);
+    BTree btree(4);
     vector<int> keys = {1,2,3,4};
     vector<Node*> children = {nullptr, nullptr, nullptr, nullptr, nullptr};
     Node node(&btree, keys, children);
@@ -70,7 +70,7 @@ void CheckLeaf(Node* n, const vector<int>& keys) {
 }
 
 TEST(BTree, Split) {
-  BTree btree(4,4);
+  BTree btree(4);
 
   vector<int> keys = {1,2,3,4};
   Node node(&btree, keys, keys);
@@ -95,7 +95,7 @@ TEST(BTree, Split) {
 }
 
 TEST(BTree, SplitUpTree) {
-  BTree btree(5,5);
+  BTree btree(5);
 
   Node root(&btree, false);
   vector<Node*> children;
@@ -114,7 +114,7 @@ TEST(BTree, SplitUpTree) {
 }
 
 TEST(BTree, Insert) {
-  BTree btree(4,4);
+  BTree btree(4);
   vector<int> keys;
   for (int i = 0; i < 200; ++i) keys.push_back(i);
   random_shuffle(keys.begin(), keys.end());
@@ -133,7 +133,7 @@ int main(int argc, char **argv) {
 
   //  int main(int argv, char** argc) {
   using namespace std::chrono;
-  BTree btree(10,10);
+  BTree btree(10);
   int NUM_ENTRIES = 20;
   vector<int> entries(NUM_ENTRIES);
   for (int i = 0; i < NUM_ENTRIES; ++i) {

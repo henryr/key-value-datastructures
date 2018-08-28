@@ -8,7 +8,7 @@
 
 using namespace std;
 
-BTree::BTree(int max_leaf_keys, int max_interior_keys) : MAX_LEAF_KEYS(max_leaf_keys), MAX_INTERIOR_KEYS(max_interior_keys) {
+BTree::BTree(int max_keys) : MAX_KEYS(max_keys) {
   // TODO don't do this, just detect it on first insert or search
   root_ = new Node(this, true);
 }
@@ -71,22 +71,24 @@ void BTree::CheckSelf() {
   }
 }
 
-Node::Node(BTree* btree, const IntVector& keys, const IntVector& values) : is_leaf_(true), keys_(btree->MAX_LEAF_KEYS), values_(btree->MAX_LEAF_KEYS), btree_(btree) {
+Node::Node(BTree* btree, const IntVector& keys, const IntVector& values) :
+    is_leaf_(true), keys_(btree->MAX_KEYS), values_(btree->MAX_KEYS), btree_(btree) {
   for (int i = 0; i < keys.size(); ++i) keys_.PushBack(keys[i]);
   for (int i = 0; i < values.size(); ++i) values_.PushBack(values[i]);
 }
 
-Node::Node(BTree* btree, const IntVector& keys, const NodeVector& links) : is_leaf_(false), keys_(btree->MAX_INTERIOR_KEYS), children_(btree->MAX_INTERIOR_KEYS + 1), btree_(btree) {
+Node::Node(BTree* btree, const IntVector& keys, const NodeVector& links) :
+    is_leaf_(false), keys_(btree->MAX_KEYS), children_(btree->MAX_KEYS + 1), btree_(btree) {
   for (int i = 0; i < keys.size(); ++i) keys_.PushBack(keys[i]);
   for (int i = 0; i < links.size(); ++i) children_.PushBack(links[i]);
   assert(keys_.size() == children_.size() - 1);
 }
 
-Node::Node(BTree* btree, bool is_leaf) : keys_(1 + (is_leaf ? btree->MAX_LEAF_KEYS : btree->MAX_INTERIOR_KEYS)),
-                                   children_(is_leaf ? 0 : btree->MAX_INTERIOR_KEYS + 2),
-                                   values_(is_leaf ? 1 + btree->MAX_LEAF_KEYS : 0),
-                                   btree_(btree),
-                                   is_leaf_(is_leaf) {
+Node::Node(BTree* btree, bool is_leaf) : keys_(btree->MAX_KEYS),
+                                         children_(is_leaf ? 0 : btree->MAX_KEYS + 1),
+                                         values_(is_leaf ? btree->MAX_KEYS : 0),
+                                         btree_(btree),
+                                         is_leaf_(is_leaf) {
   // Interior nodes have N keys and N + 1 links to the next level.
   // Leaves have N keys and N corresponding values.
 }
@@ -95,8 +97,8 @@ void Node::CheckSelf() {
   bool is_root = parent_ == nullptr;
   if (!is_leaf()) {
     if (!is_root) {
-      assert(num_keys() >= (btree_->MAX_INTERIOR_KEYS / 2) - 1);
-      assert(num_keys() < btree_->MAX_INTERIOR_KEYS);
+      assert(num_keys() >= (btree_->MAX_KEYS / 2) - 1);
+      assert(num_keys() < btree_->MAX_KEYS);
     }
     assert(num_children() == num_keys() + 1);
   } else {
@@ -133,7 +135,7 @@ void Node::InsertKeyValue(int idx, int key, int value) {
 
 void Node::Split() {
   // TODO: Move some logic to BTree
-  if (keys_.size() < (is_leaf() ? btree_->MAX_LEAF_KEYS : btree_->MAX_INTERIOR_KEYS)) return;
+  if (keys_.size() < btree_->MAX_KEYS) return;
   int median;
   Node* new_node = MakeSplittedNode(&median);
   ++btree_->num_nodes_;

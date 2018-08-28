@@ -129,14 +129,15 @@ class BTree {
   void Insert(int key, int value);
   void Delete(int key);
   int height() const { return root_->height(); }
-  BTree(int max_leaf_keys, int max_interior_keys);
+  BTree(int max_keys);
 
   void SetRoot(Node* root) { root_ = root; }
   void CheckSelf();
   int num_nodes_ = 0;
 
-  const int MAX_LEAF_KEYS;
-  const int MAX_INTERIOR_KEYS;
+  // When a node contains this many keys, it must be split.
+  // Leaf nodes contain MAX_KEYS values. Interior nodes contain MAX_KEYS + 1 links.
+  const int MAX_KEYS;
 
  private:
   // Returns the leaf node which may contain 'key', and the index of the closest key to it.
