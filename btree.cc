@@ -1,3 +1,15 @@
+// Copyright 2018 Henry Robinson
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+// in compliance with the License.  You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under the License
+// is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+// or implied.  See the License for the specific language governing permissions and limitations
+// under the License.
+
 #include <assert.h>
 #include <vector>
 #include <stack>
@@ -9,7 +21,6 @@
 using namespace std;
 
 BTree::BTree(int max_keys) : MAX_KEYS(max_keys), root_(nullptr) {
-  // TODO don't do this, just detect it on first insert or search
 }
 
 int BTree::Find(int key) {
@@ -46,12 +57,11 @@ int Node::FindKeyIdx(int key) {
 
 void BTree::Insert(int key, int value) {
   if (!root_) root_ = new Node(this, true);
-  // CheckSelf();
   int idx;
   Node* node = FindLeaf(key, &idx);
   node->InsertKeyValue(idx, key, value);
   num_nodes_ += node->Split();
-  // CheckSelf();
+  CheckSelf();
 }
 
 void BTree::CheckSelf() {
