@@ -101,6 +101,16 @@ void Node::CheckSelf() {
       assert(num_keys() < btree_->MAX_KEYS);
     }
     assert(num_children() == num_keys() + 1);
+
+    for (int i = 0; i < num_keys(); ++i) {
+      Node* child = child_at(i);
+      int key = key_at(i);
+      int prev = i == 0 ? -1 : key_at(i - 1);
+      for (int j = 0; j < child->num_keys(); ++j) {
+        assert(child->key_at(j) <= key);
+        assert(child->key_at(j) > prev);
+      }
+    }
   } else {
     assert(num_keys() == num_values());
   }
@@ -110,28 +120,30 @@ void Node::CheckSelf() {
   }
 }
 
-void Node::InsertKeyPointer(int idx, int key, Node* ptr) {
+void Node::InsertKeyPointer(int idx, int key, Node* ptr, bool after) {
   assert(!is_leaf());
-  if (idx != keys_.size()) {
-    keys_.Insert(idx, key);
-    children_.Insert(idx, ptr);
-  } else {
-    keys_.PushBack(key);
-    children_.PushBack(ptr);
+  keys_.Insert(idx, key);
+  children_.Insert(idx + (after ? 1 : 0), ptr);
+  for (int i = 1; i < num_keys(); ++i) {
+    assert(key_at(i) > key_at(i - 1));
   }
   ptr->parent_ = this;
 }
 
 void Node::InsertKeyValue(int idx, int key, int value) {
   assert(is_leaf());
-  if (idx != keys_.size()) {
-    keys_.Insert(idx, key);
-    values_.Insert(idx, value);
-  } else {
-    keys_.PushBack(key);
-    values_.PushBack(value);
+  keys_.Insert(idx, key);
+  values_.Insert(idx, value);
+  for (int i = 1; i < num_keys(); ++i) {
+    assert(key_at(i) > key_at(i - 1));
   }
 }
+
+//   0   1   4    9
+// A   B   C   D    E
+//
+//   0   1   4    5   9
+// A   B   C   D    F   E
 
 void Node::Split() {
   // TODO: Move some logic to BTree
@@ -154,7 +166,7 @@ void Node::Split() {
   }
 
   int idx = parent_->FindKeyIdx(median);
-  parent_->InsertKeyPointer(idx, median, new_node);
+  parent_->InsertKeyPointer(idx, median, new_node, true);
   parent_->Split();
 }
 

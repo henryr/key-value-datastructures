@@ -86,7 +86,7 @@ class Node {
   void Split();
 
   void InsertKeyValue(int idx, int key, int value);
-  void InsertKeyPointer(int idx, int key, Node* ptr);
+  void InsertKeyPointer(int idx, int key, Node* ptr, bool after);
 
   // Returns the index of 'key' in this node, whether it indexes a value (for a leaf) or a
   // link (for an interior node)
@@ -133,6 +133,9 @@ class BTree {
 
   void SetRoot(Node* root) { root_ = root; }
   void CheckSelf();
+
+  Node* root() { return root_; }
+
   int num_nodes_ = 0;
 
   // When a node contains this many keys, it must be split.

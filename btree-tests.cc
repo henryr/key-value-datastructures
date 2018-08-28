@@ -59,14 +59,19 @@ TEST(BTree, MakeSplittedNode) {
   }
 }
 
-void CheckLeaf(Node* n, const vector<int>& keys) {
+void CheckLeaf(Node* n, const vector<int>& keys, const vector<int>& values) {
   ASSERT_EQ(true, n->is_leaf());
-  ASSERT_EQ(keys.size(), n->num_values());
+  ASSERT_EQ(values.size(), n->num_values());
   ASSERT_EQ(keys.size(), n->num_keys());
   for (int i = 0; i < keys.size(); ++i) {
     ASSERT_EQ(keys[i], n->key_at(i));
-    ASSERT_EQ(keys[i], n->value_at(i));
+    ASSERT_EQ(values[i], n->value_at(i));
   }
+  ASSERT_EQ(n->num_keys(), n->num_values());
+}
+
+void CheckLeaf(Node* n, const vector<int>& keys) {
+  CheckLeaf(n, keys, keys);
 }
 
 TEST(BTree, Split) {
@@ -101,16 +106,28 @@ TEST(BTree, SplitUpTree) {
   vector<Node*> children;
   for (int i = 0; i < 4; ++i) {
     int s = i * 10;
-    vector<int> keys = { s, s + 1, s + 2, s + 3 };
+    vector<int> keys = { s + 1, s + 2, s + 3, s + 4 };
     Node* n = new Node(&btree, keys, keys);
-    root.InsertKeyPointer(i, (i + 1) * 10, n);
+    root.InsertKeyPointer(i, (i + 1) * 10, n, false);
   }
   vector<int> final_keys = { 50, 55, 60 };
   root.children_.PushBack(new Node(&btree, final_keys, final_keys));
 
   btree.SetRoot(&root);
 
-  btree.Insert(25, 25);
+  btree.Insert(7, 7);
+  // Expect root just to have one key because it is newly created after a split.
+  ASSERT_EQ(1, btree.root()->num_keys());
+  ASSERT_EQ(20, btree.root()->key_at(0));
+  Node* child = btree.root()->child_at(0);
+  ASSERT_EQ(2, child->num_keys());
+  ASSERT_EQ(3, child->key_at(0));
+
+  ASSERT_EQ(10, child->key_at(1));
+  ASSERT_EQ(3, child->num_children());
+
+  Node* leaf = child->child_at(0);
+  CheckLeaf(leaf, {1, 2, 3});
 }
 
 TEST(BTree, Insert) {
