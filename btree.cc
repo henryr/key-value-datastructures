@@ -55,6 +55,7 @@ void BTree::Insert(int key, int value) {
 }
 
 void BTree::CheckSelf() {
+#ifdef SANITY_CHECK
   if (!root_) return;
   stack<Node*> to_check;
   to_check.push(root_);
@@ -69,6 +70,7 @@ void BTree::CheckSelf() {
       }
     }
   }
+#endif
 }
 
 Node::Node(BTree* btree, const IntVector& keys, const IntVector& values) :
@@ -134,33 +136,27 @@ void Node::InsertKeyValue(int idx, int key, int value) {
   assert(is_leaf());
   keys_.Insert(idx, key);
   values_.Insert(idx, value);
+#ifdef SANITY_CHECK
   for (int i = 1; i < num_keys(); ++i) {
     assert(key_at(i) > key_at(i - 1));
   }
+#endif
 }
 
-//   0   1   4    9
-// A   B   C   D    E
-//
-//   0   1   4    5   9
-// A   B   C   D    F   E
-
 int Node::Split() {
-  // TODO: Move some logic to BTree
   if (keys_.size() < btree_->MAX_KEYS) return 0;
   int median;
   Node* new_node = MakeSplittedNode(&median);
   if (!parent_) {
     Node* root = new Node(btree_, false);
-    root->height_ = height_ + 1;
+    ++btree_->height_;
     root->keys_.PushBack(median);
     root->children_.PushBack(this);
     root->children_.PushBack(new_node);
 
     new_node->parent_ = root;
     parent_ = root;
-
-    btree_->SetRoot(root);
+    btree_->root_ = root;
     return 2;
   }
 
@@ -170,6 +166,7 @@ int Node::Split() {
 }
 
 Node* Node::MakeSplittedNode(int* median_key) {
+  // TODO: these are slightly outdated.
   // Steps for splitting an interior node:
   // 1. pick a median. This value will be inserted into the parent.
   // 2. create a new node with floor(keys.size() / 2) keys.

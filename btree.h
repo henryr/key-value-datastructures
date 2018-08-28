@@ -86,7 +86,6 @@ class Node {
   Node(BTree* btree, const IntVector& keys, const IntVector& values);
   Node(BTree* btree, const IntVector& keys, const NodeVector& links);
 
-
   Node* parent() const { return parent_; }
   bool is_leaf() const { return is_leaf_; }
   int height() const { return height_; }
@@ -112,7 +111,7 @@ class Node {
 
   int key_at(int idx) { return keys_[idx]; }
   int value_at(int idx) { return values_[idx]; }
-  Node* child_at(int idx) { assert(idx < children_.size()); return children_[idx]; }
+  Node* child_at(int idx) { return children_[idx]; }
 
   int num_keys() const { return keys_.size(); }
   int num_children() const { return children_.size(); }
@@ -124,8 +123,13 @@ class Node {
   int height_ = 0;
   Node* parent_ = nullptr;
   IntVector keys_;
+
+  // Only used if !is_leaf().
   NodeVector children_;
+
+  // Only used if is_leaf().
   IntVector values_;
+
   BTree* btree_;
   const bool is_leaf_;
 
@@ -139,6 +143,7 @@ class Node {
   Node* MakeSplittedNode(int* median_key);
 };
 
+// A B+-Tree of Nodes. All values are stored in leaves.
 class BTree {
  public:
   BTree(int max_keys);
@@ -153,7 +158,7 @@ class BTree {
   void Delete(int key);
 
   // Returns the height of the tree. Only set correctly for the root node.
-  int height() const { return root_->height(); }
+  int height() const { return height_; }
 
   // Used only for testing - replace the root node with a new root.
   void SetRoot(Node* root) { root_ = root; }
@@ -168,12 +173,15 @@ class BTree {
   const int MAX_KEYS;
 
  private:
+  friend class Node;
+
   // Returns the leaf node which may contain 'key', and the index of the closest key to it.
   Node* FindLeaf(int key, int* idx);
 
   FRIEND_TEST(BTree, Split);
   Node* root_ = nullptr;
   int num_nodes_ = 0;
+  int height_ = 0;
 };
 
 #endif
