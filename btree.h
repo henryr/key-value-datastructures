@@ -97,10 +97,10 @@ class Node {
   FRIEND_TEST(BTree, Split);
   FRIEND_TEST(BTree, SplitUpTree);
 
-  // Returns a new node containing all keys and values / links that fall *after* 'median_key' (which
+  // Returns a new node containing all keys and values / links that fall *after* 'pivot_key' (which
   // is the middle key in this node). This node is resized to remove all the keys and values / links
   // that are moved to the returned node.
-  Node* MakeSplittedNode(int* median_key);
+  Node* MakeSplittedNode(int* pivot_key);
 };
 
 // A B+-Tree of Nodes. All values are stored in leaves.
