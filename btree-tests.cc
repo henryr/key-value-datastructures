@@ -169,7 +169,7 @@ int main(int argc, char **argv) {
   cout << "Inserting " << NUM_ENTRIES << " elements took " << time_span.count() << "s, at rate of "
        << (NUM_ENTRIES / time_span.count()) << " elements/s" << endl;
   cout << "BTree height is: " << btree.height() << endl;
-  cout << "BTree num nodes is: " << btree.num_nodes_ << endl;
+  cout << "BTree num nodes is: " << btree.num_nodes() << endl;
 
   t1 = high_resolution_clock::now();
   for (int i = 0; i < NUM_ENTRIES; i += 1) {

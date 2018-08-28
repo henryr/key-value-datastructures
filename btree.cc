@@ -8,9 +8,8 @@
 
 using namespace std;
 
-BTree::BTree(int max_keys) : MAX_KEYS(max_keys) {
+BTree::BTree(int max_keys) : MAX_KEYS(max_keys), root_(nullptr) {
   // TODO don't do this, just detect it on first insert or search
-  root_ = new Node(this, true);
 }
 
 int BTree::Find(int key) {
@@ -46,11 +45,12 @@ int Node::FindKeyIdx(int key) {
 }
 
 void BTree::Insert(int key, int value) {
+  if (!root_) root_ = new Node(this, true);
   // CheckSelf();
   int idx;
   Node* node = FindLeaf(key, &idx);
   node->InsertKeyValue(idx, key, value);
-  node->Split();
+  num_nodes_ += node->Split();
   // CheckSelf();
 }
 
@@ -145,12 +145,11 @@ void Node::InsertKeyValue(int idx, int key, int value) {
 //   0   1   4    5   9
 // A   B   C   D    F   E
 
-void Node::Split() {
+int Node::Split() {
   // TODO: Move some logic to BTree
-  if (keys_.size() < btree_->MAX_KEYS) return;
+  if (keys_.size() < btree_->MAX_KEYS) return 0;
   int median;
   Node* new_node = MakeSplittedNode(&median);
-  ++btree_->num_nodes_;
   if (!parent_) {
     Node* root = new Node(btree_, false);
     root->height_ = height_ + 1;
@@ -162,12 +161,12 @@ void Node::Split() {
     parent_ = root;
 
     btree_->SetRoot(root);
-    return;
+    return 2;
   }
 
   int idx = parent_->FindKeyIdx(median);
   parent_->InsertKeyPointer(idx, median, new_node, true);
-  parent_->Split();
+  return 1 + parent_->Split();
 }
 
 Node* Node::MakeSplittedNode(int* median_key) {
