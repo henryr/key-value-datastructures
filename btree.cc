@@ -126,9 +126,11 @@ void Node::InsertKeyPointer(int idx, int key, Node* ptr, bool after) {
   assert(!is_leaf());
   keys_.Insert(idx, key);
   children_.Insert(idx + (after ? 1 : 0), ptr);
+#ifdef SANITY_CHECK
   for (int i = 1; i < num_keys(); ++i) {
     assert(key_at(i) > key_at(i - 1));
   }
+#endif
   ptr->parent_ = this;
 }
 
@@ -235,7 +237,7 @@ Node* Node::MakeSplittedNode(int* median_key) {
     new_node->values_.Resize(num_keys_rhs);
     new_node->keys_.Resize(num_keys_rhs);
 
-    int copy_from_idx = median_idx + 1; //(keys_.size() & 1);
+    int copy_from_idx = median_idx + 1;
     memcpy(&new_node->keys_[0], &keys_[copy_from_idx], sizeof(int) * new_node->keys_.size());
     memcpy(&new_node->values_[0], &values_[copy_from_idx], sizeof(int) * new_node->values_.size());
 

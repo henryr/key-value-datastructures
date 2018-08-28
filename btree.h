@@ -1,8 +1,16 @@
-#include <vector>
-#include "gtest/gtest.h"
-
 #ifndef BTREE_H
 #define BTREE_H
+
+// TODO:
+// 1. Memory is allocated into raw pointers and never deleted.
+// 2. Figure out whether we need FastVector
+// 3. Implement Delete()
+// 4. Experiment with top-down splitting.
+// 5. Clean up MakeSplittedNode()
+// 6. Add support for strings as keys
+
+#include <vector>
+#include "gtest/gtest.h"
 
 // A vector class with a fast-ish insert thanks to knowing its (fixed) capacity.
 // TODO: No reason std::vector doesn't do this, so compare performance and remove if needed.
@@ -50,7 +58,6 @@ class FastVector {
   int size() const { return size_; }
   int capacity() const { return capacity_; }
   T* values() const { return values_; }
-  const T& back() const { return values_[size_ - 1]; }
 
   T& operator[](int idx) {
     return values_[idx];
