@@ -20,6 +20,8 @@
 // 5. DONE - Clean up MakeSplittedNode()
 // 6. Add support for strings as keys
 // 7. DONE - Fix up InsertKeyPointer(before / after) mess
+// 8. Merge or otherwise remove the wasted space keeping both children_ and values_; should be
+//    solvable by static_cast'ing an array.
 
 #include <vector>
 #include "gtest/gtest.h"
@@ -48,7 +50,6 @@ class Node {
 
   Node* parent() const { return parent_; }
   bool is_leaf() const { return is_leaf_; }
-  int height() const { return height_; }
 
   // If num_keys() == MAX_KEYS, splits this node into two along the middle key, and updates parent_
   // to point to both this node and its new right-hand sibling. Recursively splits the parent, if
@@ -79,7 +80,6 @@ class Node {
   void CheckSelf();
 
  private:
-  int height_ = 0;
   Node* parent_ = nullptr;
   IntVector keys_;
 
