@@ -65,8 +65,20 @@ class FastVector {
 
   T operator[](int idx) const { return values_[idx]; }
 
+  ~FastVector() {
+    if (values_) delete[] values_;
+  }
+
+  void Prefetch() {
+    int step = 64 / sizeof(T);
+    for (int i = 0; i < size_; i+= step) {
+      void* v= reinterpret_cast<void*>(&values_[step]);
+      __builtin_prefetch(v);
+    }
+  }
+
  private:
-  T* values_;
+  T* values_ = nullptr;
   int size_ = 0;
   int capacity_ = 0;
 };

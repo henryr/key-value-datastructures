@@ -47,6 +47,7 @@ Node* BTree::FindLeaf(int key, int* idx) {
 
 int Node::FindKeyIdx(int key) {
   if (keys_.size() == 0) return 0;
+  keys_.Prefetch();
   // For now, linear search
   for (int i = 0; i < keys_.size(); ++i) {
     if (keys_[i] >= key) return i;

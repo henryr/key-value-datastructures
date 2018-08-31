@@ -148,12 +148,12 @@ TEST(BTree, Insert) {
 
 int main(int argc, char **argv) {
       ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
+  // return RUN_ALL_TESTS();
 
   //  int main(int argv, char** argc) {
   using namespace std::chrono;
   BTree btree(100);
-  int NUM_ENTRIES = 1000000;
+  int NUM_ENTRIES = 10000000;
   vector<int> entries(NUM_ENTRIES);
   for (int i = 0; i < NUM_ENTRIES; ++i) {
     entries[i] = i;
