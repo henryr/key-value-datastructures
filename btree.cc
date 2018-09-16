@@ -48,6 +48,12 @@ Node* BTree::FindLeaf(int key, int* idx) {
 int Node::FindKeyIdx(int key) {
   if (keys_.size() == 0) return 0;
   keys_.Prefetch();
+
+  // If we want to SSE-ize this, let's:
+  // 1. create a register with 'key' in all 8 slots
+  // 2. 8 keys_ at a time, check to see if any are greater than 'key'
+  // 3. If any are, break.
+
   // For now, linear search
   for (int i = 0; i < keys_.size(); ++i) {
     if (keys_[i] >= key) return i;
