@@ -21,8 +21,13 @@ class CircularLog {
   int64_t Insert(const std::string& key, const std::string& value);
   int64_t Update(int64_t offset, const std::string& key, const std::string& value);
 
+  // This needs to evolve to have hashtag matching
+  void ReadFrom(int64_t offset, std::string* key, std::string* value);
+
+  void DebugDump();
  private:
   void PutString(const std::string& s);
+  void ReadString(int64_t offset, int64_t len, std::string* s);
 
   int64_t size_ = 0L;
   std::unique_ptr<int8_t> buffer_;
