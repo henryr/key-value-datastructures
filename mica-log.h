@@ -26,13 +26,12 @@ class CircularLog {
 
   void DebugDump();
  private:
-  void PutString(const std::string& s);
+  int64_t PutString(int64_t offset, const std::string& s);
   void ReadString(int64_t offset, int64_t len, std::string* s);
 
   int64_t size_ = 0L;
   std::unique_ptr<int8_t> buffer_;
   int8_t* bufptr_ = nullptr;
 
-  int64_t head_ = 0L;
   int64_t tail_ = 0L;
 };

@@ -7,6 +7,7 @@ link_directories(${CMAKE_SOURCE_DIR}/thirdparty/gtest-1.8.0/lib/)
 
 add_executable(mica-test mica-test.cc mica-log.cc)
 target_link_libraries(mica-test gtest pthread)
+target_compile_options(mica-test PRIVATE -g -O3)
 
 add_executable(btree-test btree-tests.cc btree.cc)
 target_link_libraries(btree-test gtest pthread)

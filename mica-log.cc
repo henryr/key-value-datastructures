@@ -19,7 +19,7 @@ using std::cout;
 using std::endl;
 
 struct EntryHeader {
-  const char delimiter = '!';
+  char delimiter = '!';
   // Size, including this.
   int64_t size;
   int64_t keylen;
@@ -38,49 +38,53 @@ int64_t CircularLog::Insert(const string& key, const string& value) {
 }
 
 int64_t CircularLog::Update(int64_t offset, const string& key, const string& value) {
-  if (offset > -1) {
-    // TODO: Check to see if space used at offset is less than required by key + value
-  }
-
-  offset = tail_;
-
-  // Do we need to evict?
-  int64_t diff = tail_ - head_;
-  if (diff < 0) diff += size_;
+  assert(tail_ < size_);
 
   int64_t required = key.size() + value.size() + sizeof(EntryHeader);
-
-  if (size_ - diff < required) {
-    // TODO: Evict
+  if (required >= size_) {
+    return -1;
   }
 
-  // TODO Check required < size_
-  // TODO Pad to a multiple of EntryHeader so there's always room to insert the header at least.
-  EntryHeader* header = reinterpret_cast<EntryHeader*>(bufptr_ + tail_);
+  bool is_append = (offset == -1);
+  if (offset > -1) {
+    EntryHeader* header = reinterpret_cast<EntryHeader*>(bufptr_ + offset);
+    is_append = header->delimiter != '!' ||
+        (header->keylen + header->valuelen < key.size() + value.size());
+  }
+
+  if (is_append) offset = tail_;
+
+  int64_t cursor = offset;
+  EntryHeader* header = reinterpret_cast<EntryHeader*>(bufptr_ + cursor);
+  header->delimiter = '!';
   header->size = required;
   header->keylen = key.size();
   header->valuelen = value.size();
-  tail_ += sizeof(EntryHeader); tail_ = tail_ % size_;
+  cursor += sizeof(EntryHeader);
+  cursor %= size_;
+  cursor = PutString(cursor, key);
+  cursor = PutString(cursor, value);
 
-  PutString(key);
-  PutString(value);
+  if (is_append) {
+    tail_ = cursor;
+    if (size_ - tail_ < sizeof(EntryHeader)) tail_ = 0L;
+  }
 
   return offset;
 }
 
-void CircularLog::PutString(const string& s) {
-  if (size_ - tail_ > s.size()) {
-    memcpy(reinterpret_cast<void*>(bufptr_ + tail_), s.data(), s.size());
-    tail_ += s.size();
-    return;
+int64_t CircularLog::PutString(int64_t offset, const string& s) {
+  if (size_ - offset > s.size()) {
+    memcpy(reinterpret_cast<void*>(bufptr_ + offset), s.data(), s.size());
+    return offset + s.size();
   }
 
   // Otherwise split the write
-  int64_t to_write = size_ - tail_;
-  memcpy(reinterpret_cast<void*>(bufptr_ + tail_), s.data(), to_write);
+  int64_t to_write = size_ - offset;
+  memcpy(reinterpret_cast<void*>(bufptr_ + offset), s.data(), to_write);
   memcpy(reinterpret_cast<void*>(bufptr_), s.data() + to_write, s.size() - to_write);
 
-  tail_ = s.size() - to_write;
+  return s.size() - to_write;
 }
 
 void CircularLog::ReadString(int64_t offset, int64_t len, string* s) {
@@ -113,7 +117,9 @@ void CircularLog::ReadFrom(int64_t offset, string* key, string* value) {
 
   void CircularLog::DebugDump() {
     for (int64_t i = 0; i < size_; ++i) {
-      cout << i << ":" << *(reinterpret_cast<char*>(bufptr_ + i)) << endl;
+      cout << i << ":" << *(reinterpret_cast<char*>(bufptr_ + i));
+      if (i == tail_) cout << " <-- TAIL ";
+      cout << endl;
     }
     cout << endl;
   }
