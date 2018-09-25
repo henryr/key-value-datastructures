@@ -31,6 +31,14 @@ struct EntryHeader {
   int8_t tag;
 };
 
+namespace {
+
+int8_t ExtractLogTag(keyhash_t hash) {
+  return static_cast<int8_t>(0x000000000000FFFF & hash);
+}
+
+}
+
 CircularLog::CircularLog(space_t size) : size_(size) {
   assert(size_ > 0);
   void* map = mmap(0, size_, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
@@ -41,11 +49,11 @@ CircularLog::CircularLog(space_t size) : size_(size) {
   bufptr_ = reinterpret_cast<int8_t*>(map);
 }
 
-offset_t CircularLog::Insert(const string& key, const string& value) {
-  return Update(-1, key, value);
+offset_t CircularLog::Insert(const string& key, const string& value, keyhash_t hash) {
+  return Update(-1, key, value, hash);
 }
 
-offset_t CircularLog::Update(offset_t offset, const string& key, const string& value) {
+offset_t CircularLog::Update(offset_t offset, const string& key, const string& value, keyhash_t hash) {
   assert(tail_ < size_);
 
   space_t required = key.size() + value.size() + sizeof(EntryHeader);
@@ -68,6 +76,7 @@ offset_t CircularLog::Update(offset_t offset, const string& key, const string& v
   header->size = required;
   header->keylen = key.size();
   header->valuelen = value.size();
+  header->tag = ExtractLogTag(hash);
   cursor += sizeof(EntryHeader);
   cursor %= size_;
   cursor = PutString(cursor, key);
@@ -113,12 +122,14 @@ void CircularLog::ReadString(offset_t offset, entrysize_t len, string* s) {
   s->append(reinterpret_cast<char*>(bufptr_), remaining);
 }
 
-void CircularLog::ReadFrom(offset_t offset, string* key, string* value) {
+bool CircularLog::ReadFrom(offset_t offset, keyhash_t expected, string* key, string* value) {
   assert(offset < size_);
   EntryHeader* header = reinterpret_cast<EntryHeader*>(bufptr_ + offset);
+  if (header->tag != ExtractLogTag(expected)) return false;
   offset_t keystart = offset + sizeof(EntryHeader);
   ReadString(keystart, header->keylen, key);
   ReadString(keystart + header->keylen, header->valuelen, value);
+  return true;
 }
 
 void CircularLog::DebugDump() {

@@ -23,14 +23,24 @@ typedef size_t keyhash_t;
 
 class CircularLog {
  public:
+  struct Entry {
+   public:
+    const std::string key;
+    const std::string value;
+    const keyhash_t hash;
+
+    Entry(const std::string& key, const std::string& value) : key(key), value(value), hash(std::hash<std::string>{}(key)) {
+    }
+  };
+
   CircularLog(space_t size);
   ~CircularLog();
 
-  offset_t Insert(const std::string& key, const std::string& value);
-  offset_t Update(offset_t offset, const std::string& key, const std::string& value);
+  offset_t Insert(const std::string& key, const std::string& value, keyhash_t hash);
+  offset_t Update(offset_t offset, const std::string& key, const std::string& value, keyhash_t hash);
 
   // This needs to evolve to have hashtag matching
-  void ReadFrom(offset_t offset, std::string* key, std::string* value);
+  bool ReadFrom(offset_t offset, keyhash_t expected, std::string* key, std::string* value);
 
   void DebugDump();
 
