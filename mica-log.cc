@@ -14,6 +14,8 @@
 
 #include <iostream>
 
+namespace mica {
+
 using std::string;
 using std::cout;
 using std::endl;
@@ -21,26 +23,26 @@ using std::endl;
 struct EntryHeader {
   char delimiter = '!';
   // Size, including this.
-  int64_t size;
-  int64_t keylen;
-  int64_t valuelen;
+  entrysize_t size;
+  entrysize_t keylen;
+  entrysize_t valuelen;
 };
 
-CircularLog::CircularLog(int64_t size) : size_(size) {
+CircularLog::CircularLog(space_t size) : size_(size) {
   assert(size_ > 0);
 
   buffer_.reset(new int8_t[size_]);
   bufptr_ = buffer_.get();
 }
 
-int64_t CircularLog::Insert(const string& key, const string& value) {
+offset_t CircularLog::Insert(const string& key, const string& value) {
   return Update(-1, key, value);
 }
 
-int64_t CircularLog::Update(int64_t offset, const string& key, const string& value) {
+offset_t CircularLog::Update(offset_t offset, const string& key, const string& value) {
   assert(tail_ < size_);
 
-  int64_t required = key.size() + value.size() + sizeof(EntryHeader);
+  space_t required = key.size() + value.size() + sizeof(EntryHeader);
   if (required >= size_) {
     return -1;
   }
@@ -54,7 +56,7 @@ int64_t CircularLog::Update(int64_t offset, const string& key, const string& val
 
   if (is_append) offset = tail_;
 
-  int64_t cursor = offset;
+  offset_t cursor = offset;
   EntryHeader* header = reinterpret_cast<EntryHeader*>(bufptr_ + cursor);
   header->delimiter = '!';
   header->size = required;
@@ -73,21 +75,21 @@ int64_t CircularLog::Update(int64_t offset, const string& key, const string& val
   return offset;
 }
 
-int64_t CircularLog::PutString(int64_t offset, const string& s) {
+offset_t CircularLog::PutString(offset_t offset, const string& s) {
   if (size_ - offset > s.size()) {
     memcpy(reinterpret_cast<void*>(bufptr_ + offset), s.data(), s.size());
     return offset + s.size();
   }
 
   // Otherwise split the write
-  int64_t to_write = size_ - offset;
+  space_t to_write = size_ - offset;
   memcpy(reinterpret_cast<void*>(bufptr_ + offset), s.data(), to_write);
   memcpy(reinterpret_cast<void*>(bufptr_), s.data() + to_write, s.size() - to_write);
 
   return s.size() - to_write;
 }
 
-void CircularLog::ReadString(int64_t offset, int64_t len, string* s) {
+void CircularLog::ReadString(offset_t offset, entrysize_t len, string* s) {
   offset %= size_;
   if (offset + len < size_) {
     *s = string(reinterpret_cast<char*>(bufptr_ + offset), len);
@@ -99,27 +101,29 @@ void CircularLog::ReadString(int64_t offset, int64_t len, string* s) {
 
   // Read from offset to size_
   int8_t* start = bufptr_ + offset;
-  s->append(reinterpret_cast<char*>(start), size_ - offset); // TODO off by one?
+  s->append(reinterpret_cast<char*>(start), size_ - offset);
 
-  int64_t remaining = len - (size_ - offset);
+  space_t remaining = len - (size_ - offset);
   s->append(reinterpret_cast<char*>(bufptr_), remaining);
 }
 
-void CircularLog::ReadFrom(int64_t offset, string* key, string* value) {
+void CircularLog::ReadFrom(offset_t offset, string* key, string* value) {
   assert(offset < size_);
   EntryHeader* header = reinterpret_cast<EntryHeader*>(bufptr_ + offset);
-  int64_t keystart = offset + sizeof(EntryHeader);
+  offset_t keystart = offset + sizeof(EntryHeader);
   ReadString(keystart, header->keylen, key);
   ReadString(keystart + header->keylen, header->valuelen, value);
   // *key = string(reinterpret_cast<char*>(keystart), header->keylen);
   // *value = string(reinterpret_cast<char*>(keystart + header->keylen), header->valuelen);
 }
 
-  void CircularLog::DebugDump() {
-    for (int64_t i = 0; i < size_; ++i) {
-      cout << i << ":" << *(reinterpret_cast<char*>(bufptr_ + i));
-      if (i == tail_) cout << " <-- TAIL ";
-      cout << endl;
-    }
+void CircularLog::DebugDump() {
+  for (offset_t i = 0; i < size_; ++i) {
+    cout << i << ":" << *(reinterpret_cast<char*>(bufptr_ + i));
+    if (i == tail_) cout << " <-- TAIL ";
     cout << endl;
   }
+  cout << endl;
+}
+
+}

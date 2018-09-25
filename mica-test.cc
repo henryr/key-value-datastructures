@@ -14,6 +14,7 @@
 #include "gtest/gtest.h"
 
 using std::string;
+using mica::CircularLog;
 
 TEST(Mica, SmokeTest) {
   CircularLog log(1024 * 1024);
