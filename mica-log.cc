@@ -13,6 +13,8 @@
 #include "mica-log.h"
 
 #include <iostream>
+#include <sys/mman.h>
+#include <mach/mach_vm.h>
 
 namespace mica {
 
@@ -26,13 +28,17 @@ struct EntryHeader {
   entrysize_t size;
   entrysize_t keylen;
   entrysize_t valuelen;
+  int8_t tag;
 };
 
 CircularLog::CircularLog(space_t size) : size_(size) {
   assert(size_ > 0);
-
-  buffer_.reset(new int8_t[size_]);
-  bufptr_ = buffer_.get();
+  void* map = mmap(0, size_, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+  if (map == MAP_FAILED) {
+    cout << "ERRORNO: " << errno << " (enomem: " << ENOMEM << ")" << endl;
+    assert(false);  // TODO
+  }
+  bufptr_ = reinterpret_cast<int8_t*>(map);
 }
 
 offset_t CircularLog::Insert(const string& key, const string& value) {
@@ -113,8 +119,6 @@ void CircularLog::ReadFrom(offset_t offset, string* key, string* value) {
   offset_t keystart = offset + sizeof(EntryHeader);
   ReadString(keystart, header->keylen, key);
   ReadString(keystart + header->keylen, header->valuelen, value);
-  // *key = string(reinterpret_cast<char*>(keystart), header->keylen);
-  // *value = string(reinterpret_cast<char*>(keystart + header->keylen), header->valuelen);
 }
 
 void CircularLog::DebugDump() {
@@ -124,6 +128,10 @@ void CircularLog::DebugDump() {
     cout << endl;
   }
   cout << endl;
+}
+
+CircularLog::~CircularLog() {
+  if (bufptr_ != nullptr) munmap(bufptr_, size_);
 }
 
 }

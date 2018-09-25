@@ -19,10 +19,12 @@ namespace mica {
 typedef int64_t offset_t;
 typedef int32_t entrysize_t;
 typedef int64_t space_t;
+typedef size_t keyhash_t;
 
 class CircularLog {
  public:
   CircularLog(space_t size);
+  ~CircularLog();
 
   offset_t Insert(const std::string& key, const std::string& value);
   offset_t Update(offset_t offset, const std::string& key, const std::string& value);
@@ -31,12 +33,12 @@ class CircularLog {
   void ReadFrom(offset_t offset, std::string* key, std::string* value);
 
   void DebugDump();
+
  private:
   offset_t PutString(offset_t offset, const std::string& s);
   void ReadString(offset_t offset, entrysize_t len, std::string* s);
 
   space_t size_ = 0L;
-  std::unique_ptr<int8_t> buffer_;
   int8_t* bufptr_ = nullptr;
 
   offset_t tail_ = 0L;

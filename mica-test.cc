@@ -71,6 +71,18 @@ TEST(Mica, Update) {
   ASSERT_EQ("tuesday", value);
 }
 
+TEST(Mica, Benchmark) {
+  CircularLog log(1024 * 1024 * 256);
+
+  string key(1024 * 1024, 'a');
+  string value(1024 * 1024, 'b');
+
+  for (int i = 0; i < 1024; ++i) {
+    mica::offset_t offset = log.Insert(key, value);
+    ASSERT_NE(-1, offset);
+  }
+}
+
 int main(int argv, char** argc) {
   testing::InitGoogleTest(&argv, argc);
   return RUN_ALL_TESTS();
