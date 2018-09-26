@@ -17,6 +17,8 @@ using std::string;
 using std::hash;
 using mica::CircularLog;
 using mica::Entry;
+using mica::Index;
+using mica::LossyHash;
 using mica::offset_t;
 
 TEST(Mica, SmokeTest) {
@@ -88,6 +90,28 @@ TEST(Mica, Benchmark) {
     mica::offset_t offset = log.Insert(entry.key, entry.value, entry.hash);
     ASSERT_NE(-1, offset);
   }
+}
+
+TEST(MicaIndex, ReadAndWrite) {
+  Index idx(1024);
+  Entry entry("hello", "world");
+
+  idx.Insert(entry);
+
+  string value;
+  ASSERT_TRUE(idx.Read(entry.key, entry.hash, &value));
+  ASSERT_EQ(entry.value, value);
+
+  ASSERT_FALSE(idx.Read(entry.key, 0, &value));
+}
+
+TEST(MicaLossyHash, ReadAndWrite) {
+  LossyHash lossy_hash(256);
+  ASSERT_EQ(-1, lossy_hash.Lookup(123456));
+
+  lossy_hash.Insert(123456, 789, -1);
+  ASSERT_EQ(789, lossy_hash.Lookup(123456));
+  ASSERT_EQ(-1, lossy_hash.Lookup(654321));
 }
 
 int main(int argv, char** argc) {

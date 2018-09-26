@@ -28,13 +28,17 @@ struct EntryHeader {
   entrysize_t size;
   entrysize_t keylen;
   entrysize_t valuelen;
-  int8_t tag;
+  tag_t tag;
 };
 
 namespace {
 
-int8_t ExtractLogTag(keyhash_t hash) {
-  return static_cast<int8_t>(0x000000000000FFFF & hash);
+int16_t ExtractLogTag(keyhash_t hash) {
+  return static_cast<int16_t>(0x000000000000FFFF & hash);
+}
+
+int16_t ExtractHashTag(keyhash_t hash) {
+  return static_cast<int16_t>(0x000000000000FFFF & (hash >> 16));
 }
 
 }
@@ -149,6 +153,7 @@ CircularLog::~CircularLog() {
 Index::Index(space_t size) : log_(size) { }
 
 void Index::Insert(const Entry& entry) {
+  // TODO: Could check if entry exists and use Update directly.
   offset_t offset = log_.Insert(entry.key, entry.value, entry.hash);
   idx_[entry.key] = {entry.hash, offset};
 }
@@ -157,7 +162,10 @@ bool Index::Update(const Entry& entry) {
   auto it = idx_.find(entry.key);
   if (it == idx_.end()) return false;
 
-  return log_.Update(it->second.second, entry.key, entry.value, entry.hash);
+  offset_t offset = log_.Update(it->second.second, entry.key, entry.value, entry.hash);
+  if (offset == -1) return false;
+  it->second.second = offset;
+  return true;
 }
 
 void Index::Delete(const string& key) {
@@ -174,4 +182,65 @@ bool Index::Read(const std::string& key, keyhash_t hash, std::string* value) {
   // This is the only time that the key is completely compared to the requested one.
   return key == stored_key;
 }
+
+LossyHash::LossyHash(int16_t num_buckets) : num_buckets_(num_buckets) {
+  buckets_ = new Bucket[num_buckets];
+}
+
+offset_t LossyHash::Lookup(keyhash_t hash) {
+  tag_t bucket_number = ExtractHashTag(hash);
+  Bucket* bucket = buckets_ + (bucket_number % num_buckets_);
+
+  tag_t log_tag = ExtractLogTag(hash);
+  for (int i = 0; i < Bucket::NUM_ENTRIES; ++i) {
+    if (bucket->entries[i].tag == log_tag) return bucket->entries[i].offset;
+  }
+
+  return -1;
+}
+
+void LossyHash::Insert(keyhash_t hash, offset_t offset, offset_t log_tail) {
+  tag_t bucket_number = ExtractHashTag(hash);
+  Bucket* bucket = buckets_ + (bucket_number % num_buckets_);
+
+  tag_t log_tag = ExtractLogTag(hash);
+
+  // TODO: Use log_tail to find the 'oldest' entry and delete that.
+  // For now, use some of the hash to pick an entry at random.
+  int entry_idx = (0xFFFF & hash) % Bucket::NUM_ENTRIES;
+  for (int i = 0; i < Bucket::NUM_ENTRIES; ++i) {
+    LossyHash::Entry* entry = &(bucket->entries[i]);
+    if (entry->offset == -1 || entry->tag == log_tag) {
+      // Either there's a spare entry, or this is a duplicate tag which we must overwrite to avoid
+      // false negatives on read.
+      entry_idx = i;
+      break;
+    }
+  }
+
+  // No space, and no duplicate to overwrite.
+  bucket->entries[entry_idx] = {log_tag, offset};
+}
+
+void LossyIndex::Insert(const Entry& entry) {
+  offset_t offset = log_.Insert(entry.key, entry.value, entry.hash);
+  idx_.Insert(entry.hash, offset, -1);
+}
+
+bool LossyIndex::Update(const Entry& entry) {
+  // TODO - need to refactor because we want to avoid double lookup in the hash to find the offset
+  // and then rewrite it.
+  return false;
+}
+
+bool LossyIndex::Read(const std::string& key, keyhash_t hash, std::string* value) {
+  offset_t offset = idx_.Lookup(hash);
+  if (offset == -1) return false;
+
+  string stored_key;
+  if (!log_.ReadFrom(offset, hash, &stored_key, value)) return false;
+
+  return (stored_key == key);
+}
+
 }
