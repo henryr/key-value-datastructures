@@ -13,6 +13,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
 
 namespace mica {
 
@@ -23,23 +24,12 @@ typedef size_t keyhash_t;
 
 class CircularLog {
  public:
-  struct Entry {
-   public:
-    const std::string key;
-    const std::string value;
-    const keyhash_t hash;
-
-    Entry(const std::string& key, const std::string& value) : key(key), value(value), hash(std::hash<std::string>{}(key)) {
-    }
-  };
-
   CircularLog(space_t size);
   ~CircularLog();
 
   offset_t Insert(const std::string& key, const std::string& value, keyhash_t hash);
   offset_t Update(offset_t offset, const std::string& key, const std::string& value, keyhash_t hash);
 
-  // This needs to evolve to have hashtag matching
   bool ReadFrom(offset_t offset, keyhash_t expected, std::string* key, std::string* value);
 
   void DebugDump();
@@ -52,6 +42,30 @@ class CircularLog {
   int8_t* bufptr_ = nullptr;
 
   offset_t tail_ = 0L;
+};
+
+struct Entry {
+ public:
+  const std::string key;
+  const std::string value;
+  const keyhash_t hash;
+
+  Entry(const std::string& key, const std::string& value) : key(key), value(value), hash(std::hash<std::string>{}(key)) {
+  }
+};
+
+class Index {
+ public:
+  Index(space_t size);
+
+  void Insert(const Entry& entry);
+  bool Update(const Entry& entry);
+  void Delete(const std::string& key);
+  bool Read(const std::string& key, keyhash_t hash, std::string* value);
+
+ private:
+  CircularLog log_;
+  std::unordered_map<std::string, std::pair<keyhash_t, offset_t>> idx_;
 };
 
 }

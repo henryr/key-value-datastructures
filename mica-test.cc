@@ -16,15 +16,16 @@
 using std::string;
 using std::hash;
 using mica::CircularLog;
+using mica::Entry;
 using mica::offset_t;
 
 TEST(Mica, SmokeTest) {
   CircularLog log(1024 * 1024);
-  CircularLog::Entry hello_world("hello", "world");
+  Entry hello_world("hello", "world");
   int64_t offset = log.Insert(hello_world.key, hello_world.value, hello_world.hash);
   ASSERT_EQ(0, offset);
 
-  CircularLog::Entry bonjour("bonjour", "tout le monde");
+  Entry bonjour("bonjour", "tout le monde");
   int64_t fr_offset = log.Insert(bonjour.key, bonjour.value, bonjour.hash);
   // log.DebugDump();
   ASSERT_LT(offset + 10, fr_offset);
@@ -41,10 +42,10 @@ TEST(Mica, SmokeTest) {
 
 TEST(Mica, Wrapped) {
   CircularLog log(70);
-  CircularLog::Entry entry("he", "wo");
+  Entry entry("he", "wo");
   log.Insert(entry.key, entry.value, entry.hash);
 
-  CircularLog::Entry entry2("HELLO", "WORLD");
+  Entry entry2("HELLO", "WORLD");
   int64_t offset = log.Insert(entry2.key, entry2.value, entry2.hash);
   ASSERT_GT(40, offset);
 
@@ -57,13 +58,13 @@ TEST(Mica, Wrapped) {
 TEST(Mica, Update) {
   CircularLog log(1024);
 
-  CircularLog::Entry hello("hello", "world");
+  Entry hello("hello", "world");
   offset_t offset = log.Insert(hello.key, hello.value, hello.hash);;
 
-  CircularLog::Entry days("monday", "tuesday");
+  Entry days("monday", "tuesday");
   offset_t daysoffset = log.Insert(days.key, days.value, days.hash);
 
-  CircularLog::Entry shorter("hel", "wor");
+  Entry shorter("hel", "wor");
   offset_t newoffset = log.Update(offset, shorter.key, shorter.value, shorter.hash);
   ASSERT_EQ(offset, newoffset) << "Update with shorter string should have been in-place";
 
@@ -71,7 +72,7 @@ TEST(Mica, Update) {
   ASSERT_LT(0, newoffset) << "Update with longer string should have been an append";
 
   // Check that updating hasn't screwed up the write cursor.
-  CircularLog::Entry days2("wednesday", "thursday");
+  Entry days2("wednesday", "thursday");
   log.Insert(days2.key, days2.value, days2.hash);
   string key, value;
   log.ReadFrom(daysoffset, days.hash, &key, &value);
@@ -82,7 +83,7 @@ TEST(Mica, Update) {
 TEST(Mica, Benchmark) {
   CircularLog log(1024 * 1024 * 256);
 
-  CircularLog::Entry entry(string(1024 * 1024, 'a'), string(1024 * 1024, 'b'));
+  Entry entry(string(1024 * 1024, 'a'), string(1024 * 1024, 'b'));
   for (int i = 0; i < 1024; ++i) {
     mica::offset_t offset = log.Insert(entry.key, entry.value, entry.hash);
     ASSERT_NE(-1, offset);

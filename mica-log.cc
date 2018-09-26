@@ -145,4 +145,33 @@ CircularLog::~CircularLog() {
   if (bufptr_ != nullptr) munmap(bufptr_, size_);
 }
 
+
+Index::Index(space_t size) : log_(size) { }
+
+void Index::Insert(const Entry& entry) {
+  offset_t offset = log_.Insert(entry.key, entry.value, entry.hash);
+  idx_[entry.key] = {entry.hash, offset};
+}
+
+bool Index::Update(const Entry& entry) {
+  auto it = idx_.find(entry.key);
+  if (it == idx_.end()) return false;
+
+  return log_.Update(it->second.second, entry.key, entry.value, entry.hash);
+}
+
+void Index::Delete(const string& key) {
+  idx_.erase(key);
+}
+
+bool Index::Read(const std::string& key, keyhash_t hash, std::string* value) {
+  auto it = idx_.find(key);
+  if (it == idx_.end()) return false;
+
+  string stored_key;
+  if (!log_.ReadFrom(it->second.second, hash, &stored_key, value)) return false;
+
+  // This is the only time that the key is completely compared to the requested one.
+  return key == stored_key;
+}
 }
