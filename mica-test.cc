@@ -16,6 +16,7 @@
 using std::string;
 using std::hash;
 using mica::CircularLog;
+using mica::offset_t;
 
 TEST(Mica, SmokeTest) {
   CircularLog log(1024 * 1024);
@@ -38,52 +39,55 @@ TEST(Mica, SmokeTest) {
   ASSERT_EQ("tout le monde", value);
 }
 
-// TEST(Mica, Wrapped) {
-//   CircularLog log(70);
+TEST(Mica, Wrapped) {
+  CircularLog log(70);
+  CircularLog::Entry entry("he", "wo");
+  log.Insert(entry.key, entry.value, entry.hash);
 
-//   log.Insert("he", "wo");
-//   // log.DebugDump();
-//   int64_t offset = log.Insert("HELLO", "WORLD");
-//   ASSERT_GT(40, offset);
-//   // ASSERT_EQ(0, offset);
+  CircularLog::Entry entry2("HELLO", "WORLD");
+  int64_t offset = log.Insert(entry2.key, entry2.value, entry2.hash);
+  ASSERT_GT(40, offset);
 
-//   string key, value;
-//   log.ReadFrom(offset, &key, &value);
-//   ASSERT_EQ("HELLO", key);
-//   ASSERT_EQ("WORLD", value);
-//   // log.DebugDump();
-// }
+  string key, value;
+  ASSERT_TRUE(log.ReadFrom(offset, entry2.hash, &key, &value));
+  ASSERT_EQ("HELLO", key);
+  ASSERT_EQ("WORLD", value);
+}
 
-// TEST(Mica, Update) {
-//   CircularLog log(1024);
-//   int64_t offset = log.Insert("hello", "world");
-//   int64_t daysoffset = log.Insert("monday", "tuesday");
+TEST(Mica, Update) {
+  CircularLog log(1024);
 
-//   int64_t newoffset = log.Update(offset, "hel", "wor");
-//   ASSERT_EQ(offset, newoffset) << "Update with shorter string should have been in-place";
+  CircularLog::Entry hello("hello", "world");
+  offset_t offset = log.Insert(hello.key, hello.value, hello.hash);;
 
-//   newoffset = log.Update(offset, "hello", "world");
-//   ASSERT_LT(0, newoffset) << "Update with longer string should have been an append";
+  CircularLog::Entry days("monday", "tuesday");
+  offset_t daysoffset = log.Insert(days.key, days.value, days.hash);
 
-//   // Check that updating hasn't screwed up the write cursor.
-//   log.Insert("wednesday", "thursday");
-//   string key, value;
-//   log.ReadFrom(daysoffset, &key, &value);
-//   ASSERT_EQ("monday", key);
-//   ASSERT_EQ("tuesday", value);
-// }
+  CircularLog::Entry shorter("hel", "wor");
+  offset_t newoffset = log.Update(offset, shorter.key, shorter.value, shorter.hash);
+  ASSERT_EQ(offset, newoffset) << "Update with shorter string should have been in-place";
 
-// TEST(Mica, Benchmark) {
-//   CircularLog log(1024 * 1024 * 256);
+  newoffset = log.Update(offset, hello.key, hello.value, hello.hash);
+  ASSERT_LT(0, newoffset) << "Update with longer string should have been an append";
 
-//   string key(1024 * 1024, 'a');
-//   string value(1024 * 1024, 'b');
+  // Check that updating hasn't screwed up the write cursor.
+  CircularLog::Entry days2("wednesday", "thursday");
+  log.Insert(days2.key, days2.value, days2.hash);
+  string key, value;
+  log.ReadFrom(daysoffset, days.hash, &key, &value);
+  ASSERT_EQ("monday", key);
+  ASSERT_EQ("tuesday", value);
+}
 
-//   for (int i = 0; i < 1024; ++i) {
-//     mica::offset_t offset = log.Insert(key, value);
-//     ASSERT_NE(-1, offset);
-//   }
-// }
+TEST(Mica, Benchmark) {
+  CircularLog log(1024 * 1024 * 256);
+
+  CircularLog::Entry entry(string(1024 * 1024, 'a'), string(1024 * 1024, 'b'));
+  for (int i = 0; i < 1024; ++i) {
+    mica::offset_t offset = log.Insert(entry.key, entry.value, entry.hash);
+    ASSERT_NE(-1, offset);
+  }
+}
 
 int main(int argv, char** argc) {
   testing::InitGoogleTest(&argv, argc);
