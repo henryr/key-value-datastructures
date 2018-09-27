@@ -15,7 +15,7 @@
 #include <string>
 #include <unordered_map>
 
-namespace mica {
+namespace formica {
 
 typedef int64_t offset_t;
 typedef int32_t entrysize_t;
@@ -34,11 +34,11 @@ struct Entry {
   }
 };
 
-inline int16_t ExtractLogTag(keyhash_t hash) {
+inline tag_t ExtractLogTag(keyhash_t hash) {
   return static_cast<int16_t>(0x000000000000FFFF & hash);
 }
 
-inline int16_t ExtractHashTag(keyhash_t hash) {
+inline tag_t ExtractHashTag(keyhash_t hash) {
   return static_cast<int16_t>(0x000000000000FFFF & (hash >> 16));
 }
 

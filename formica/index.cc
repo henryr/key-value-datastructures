@@ -14,7 +14,7 @@
 
 #include <iostream>
 
-namespace mica {
+namespace formica {
 
 using std::string;
 using std::cout;
@@ -157,6 +157,20 @@ bool ChainedLossyHashIndex::Read(const string& key, keyhash_t hash, string* valu
 ChainedLossyHashIndex::ChainedLossyHashIndex(int num_buckets) : num_buckets_(num_buckets) {
   buckets_ = new Node*[num_buckets_];
   for (int i = 0; i < num_buckets_; ++i) buckets_[i] = nullptr;
+}
+
+ChainedLossyHashIndex::~ChainedLossyHashIndex() {
+  if (buckets_ == nullptr) return;
+  for (int i = 0; i < num_buckets_; ++i) {
+    Node* node = buckets_[i];
+    Node* next = nullptr;
+    while (node) {
+      next = node->next;
+      delete node;
+      node = next;
+    }
+  }
+  delete buckets_;
 }
 
 }

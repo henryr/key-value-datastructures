@@ -19,7 +19,7 @@ using std::string;
 using std::cout;
 using std::endl;
 
-namespace mica {
+namespace formica {
 
 struct EntryHeader {
   char delimiter = '!';
@@ -116,7 +116,10 @@ void CircularLog::ReadString(offset_t offset, entrysize_t len, string* s) {
 bool CircularLog::ReadFrom(offset_t offset, keyhash_t expected, string* key, string* value) {
   assert(offset < size_);
   EntryHeader* header = reinterpret_cast<EntryHeader*>(bufptr_ + offset);
-  if (header->tag != ExtractLogTag(expected)) return false;
+  if (header->tag != ExtractLogTag(expected)) {
+    cout << "Expected tag: " << ExtractLogTag(expected) << ", but got: " << header->tag << endl;
+    return false;
+  }
   offset_t keystart = offset + sizeof(EntryHeader);
   ReadString(keystart, header->keylen, key);
   ReadString(keystart + header->keylen, header->valuelen, value);

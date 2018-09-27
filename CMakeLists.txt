@@ -8,13 +8,13 @@ link_directories(${CMAKE_SOURCE_DIR}/thirdparty/gtest-1.8.0/lib/)
 include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/thirdparty/google-benchmark/include)
 link_directories(${CMAKE_SOURCE_DIR}/thirdparty/google-benchmark/lib/)
 
-add_library(mica
-  mica/mica-log.cc
-  mica/circular-log.cc)
+add_library(formica
+  formica/index.cc
+  formica/circular-log.cc)
 
-add_executable(mica-test mica/mica-test.cc)
-target_link_libraries(mica-test mica gtest pthread)
-target_compile_options(mica-test PRIVATE -g -O3)
+add_executable(formica-test formica/formica-test.cc)
+target_link_libraries(formica-test formica gtest pthread)
+target_compile_options(formica-test PRIVATE -g -O3)
 
 add_executable(btree-test btree-tests.cc btree.cc)
 target_link_libraries(btree-test gtest pthread)
@@ -22,9 +22,9 @@ target_compile_options(btree-test PRIVATE -g -O3)
 # target_compile_options(btree-test PRIVATE -fsanitize=address)
 # target_link_libraries(btree-test -fsanitize=address)
 
-add_executable(mica-benchmark mica/mica-benchmark.cc)
-target_link_libraries(mica-benchmark mica benchmark)
-target_compile_options(mica-benchmark PRIVATE -g -O3)
+add_executable(formica-benchmark formica/formica-benchmark.cc)
+target_link_libraries(formica-benchmark formica benchmark)
+target_compile_options(formica-benchmark PRIVATE -g -O3)
 
-# target_compile_options(mica-benchmark PRIVATE -fsanitize=address)
-# target_link_libraries(mica-benchmark -fsanitize=address)
+# target_compile_options(formica-benchmark PRIVATE -fsanitize=address)
+# target_link_libraries(formica-benchmark -fsanitize=address)

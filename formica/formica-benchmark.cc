@@ -1,3 +1,15 @@
+// Copyright 2018 Henry Robinson
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+// in compliance with the License.  You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under the License
+// is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+// or implied.  See the License for the specific language governing permissions and limitations
+// under the License.
+
 #include "index.h"
 
 #include "benchmark/benchmark.h"
@@ -6,13 +18,13 @@ using std::string;
 using std::hash;
 using std::vector;
 using std::pair;
-using mica::CircularLog;
-using mica::Entry;
-using mica::Index;
-using mica::LossyHash;
-using mica::LossyIndex;
-using mica::ChainedLossyHashIndex;
-using mica::offset_t;
+using formica::CircularLog;
+using formica::Entry;
+using formica::Index;
+using formica::LossyHash;
+using formica::LossyIndex;
+using formica::ChainedLossyHashIndex;
+using formica::offset_t;
 
 string RandomString(int l) {
   string ret(l, 'a');

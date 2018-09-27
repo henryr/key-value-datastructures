@@ -15,12 +15,12 @@
 
 using std::string;
 using std::hash;
-using mica::CircularLog;
-using mica::Entry;
-using mica::Index;
-using mica::LossyHash;
-using mica::LossyIndex;
-using mica::offset_t;
+using formica::CircularLog;
+using formica::Entry;
+using formica::Index;
+using formica::LossyHash;
+using formica::LossyIndex;
+using formica::offset_t;
 
 TEST(CircularLog, SmokeTest) {
   CircularLog log(1024 * 1024);
@@ -59,13 +59,17 @@ TEST(CircularLog, Wrapped) {
 }
 
 TEST(CircularLog, Update) {
-  CircularLog log(1024);
+  CircularLog log(256);
 
   Entry hello("hello", "world");
   offset_t offset = log.Insert(hello.key, hello.value, hello.hash);;
 
   Entry days("monday", "tuesday");
   offset_t daysoffset = log.Insert(days.key, days.value, days.hash);
+  {
+    string key, value;
+    ASSERT_TRUE(log.ReadFrom(daysoffset, days.hash, &key, &value));
+  }
 
   Entry shorter("hel", "wor");
   offset_t newoffset = log.Update(offset, shorter.key, shorter.value, shorter.hash);
@@ -78,18 +82,22 @@ TEST(CircularLog, Update) {
   Entry days2("wednesday", "thursday");
   log.Insert(days2.key, days2.value, days2.hash);
   string key, value;
-  log.ReadFrom(daysoffset, days.hash, &key, &value);
+  ASSERT_TRUE(log.ReadFrom(daysoffset, days.hash, &key, &value));
   ASSERT_EQ("monday", key);
   ASSERT_EQ("tuesday", value);
 }
 
-TEST(CircularLog, Benchmark) {
+TEST(CircularLog, WorkloadTest) {
   CircularLog log(1024 * 1024 * 256);
 
   Entry entry(string(1024 * 1024, 'a'), string(1024 * 1024, 'b'));
   for (int i = 0; i < 1024; ++i) {
-    mica::offset_t offset = log.Insert(entry.key, entry.value, entry.hash);
+    formica::offset_t offset = log.Insert(entry.key, entry.value, entry.hash);
     ASSERT_NE(-1, offset);
+    string key, value;
+    ASSERT_TRUE(log.ReadFrom(offset, entry.hash, &key, &value));
+    ASSERT_EQ(entry.key, key);
+    ASSERT_EQ(entry.value, value);
   }
 }
 

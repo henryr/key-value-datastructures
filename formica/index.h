@@ -1,8 +1,20 @@
+// Copyright 2018 Henry Robinson
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+// in compliance with the License.  You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under the License
+// is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+// or implied.  See the License for the specific language governing permissions and limitations
+// under the License.
+
 #pragma once
 
 #include "circular-log.h"
 
-namespace mica {
+namespace formica {
 
 class Index {
  public:
@@ -67,6 +79,9 @@ class ChainedLossyHashIndex {
   ChainedLossyHashIndex(int num_buckets);
   void Insert(const Entry& entry);
   bool Read(const std::string& key, keyhash_t hash, std::string* value);
+
+  ~ChainedLossyHashIndex();
+
  private:
   struct Node {
     Node* next = nullptr;
@@ -77,7 +92,7 @@ class ChainedLossyHashIndex {
   };
   int16_t num_buckets_ = 0;
 
-  Node** buckets_;
+  Node** buckets_ = nullptr;
 
 };
 
