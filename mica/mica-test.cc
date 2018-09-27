@@ -10,7 +10,7 @@
 // or implied.  See the License for the specific language governing permissions and limitations
 // under the License.
 
-#include "mica-log.h"
+#include "index.h"
 #include "gtest/gtest.h"
 
 using std::string;

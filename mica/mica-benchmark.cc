@@ -1,4 +1,4 @@
-#include "mica-log.h"
+#include "index.h"
 
 #include "benchmark/benchmark.h"
 
