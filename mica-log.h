@@ -66,7 +66,7 @@ class Index {
 
  private:
   CircularLog log_;
-  std::unordered_map<std::string, std::pair<keyhash_t, offset_t>> idx_;
+  std::unordered_map<tag_t, std::pair<keyhash_t, offset_t>> idx_;
 };
 
 class LossyHash {

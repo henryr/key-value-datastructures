@@ -155,11 +155,12 @@ Index::Index(space_t size) : log_(size) { }
 void Index::Insert(const Entry& entry) {
   // TODO: Could check if entry exists and use Update directly.
   offset_t offset = log_.Insert(entry.key, entry.value, entry.hash);
-  idx_[entry.key] = {entry.hash, offset};
+  tag_t bucket_tag = ExtractHashTag(entry.hash);
+  idx_[bucket_tag] = {entry.hash, -1};
 }
 
 bool Index::Update(const Entry& entry) {
-  auto it = idx_.find(entry.key);
+  auto it = idx_.find(ExtractHashTag(entry.hash));
   if (it == idx_.end()) return false;
 
   offset_t offset = log_.Update(it->second.second, entry.key, entry.value, entry.hash);
@@ -169,11 +170,11 @@ bool Index::Update(const Entry& entry) {
 }
 
 void Index::Delete(const string& key) {
-  idx_.erase(key);
+  // idx_.erase(ExtractHashTag(key);
 }
 
 bool Index::Read(const std::string& key, keyhash_t hash, std::string* value) {
-  auto it = idx_.find(key);
+  auto it = idx_.find(ExtractHashTag(hash));
   if (it == idx_.end()) return false;
 
   string stored_key;
@@ -221,6 +222,8 @@ void LossyHash::Insert(keyhash_t hash, offset_t offset, offset_t log_tail) {
   // No space, and no duplicate to overwrite.
   bucket->entries[entry_idx] = {log_tag, offset};
 }
+
+LossyIndex::LossyIndex(space_t size, int16_t num_buckets) : idx_(num_buckets), log_(size) { }
 
 void LossyIndex::Insert(const Entry& entry) {
   offset_t offset = log_.Insert(entry.key, entry.value, entry.hash);

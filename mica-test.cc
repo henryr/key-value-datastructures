@@ -19,9 +19,10 @@ using mica::CircularLog;
 using mica::Entry;
 using mica::Index;
 using mica::LossyHash;
+using mica::LossyIndex;
 using mica::offset_t;
 
-TEST(Mica, SmokeTest) {
+TEST(CircularLog, SmokeTest) {
   CircularLog log(1024 * 1024);
   Entry hello_world("hello", "world");
   int64_t offset = log.Insert(hello_world.key, hello_world.value, hello_world.hash);
@@ -42,7 +43,7 @@ TEST(Mica, SmokeTest) {
   ASSERT_EQ("tout le monde", value);
 }
 
-TEST(Mica, Wrapped) {
+TEST(CircularLog, Wrapped) {
   CircularLog log(70);
   Entry entry("he", "wo");
   log.Insert(entry.key, entry.value, entry.hash);
@@ -57,7 +58,7 @@ TEST(Mica, Wrapped) {
   ASSERT_EQ("WORLD", value);
 }
 
-TEST(Mica, Update) {
+TEST(CircularLog, Update) {
   CircularLog log(1024);
 
   Entry hello("hello", "world");
@@ -82,7 +83,7 @@ TEST(Mica, Update) {
   ASSERT_EQ("tuesday", value);
 }
 
-TEST(Mica, Benchmark) {
+TEST(CircularLog, Benchmark) {
   CircularLog log(1024 * 1024 * 256);
 
   Entry entry(string(1024 * 1024, 'a'), string(1024 * 1024, 'b'));
@@ -92,7 +93,7 @@ TEST(Mica, Benchmark) {
   }
 }
 
-TEST(MicaIndex, ReadAndWrite) {
+TEST(Index, ReadAndWrite) {
   Index idx(1024);
   Entry entry("hello", "world");
 
@@ -105,7 +106,7 @@ TEST(MicaIndex, ReadAndWrite) {
   ASSERT_FALSE(idx.Read(entry.key, 0, &value));
 }
 
-TEST(MicaLossyHash, ReadAndWrite) {
+TEST(LossyHash, ReadAndWrite) {
   LossyHash lossy_hash(256);
   ASSERT_EQ(-1, lossy_hash.Lookup(123456));
 
@@ -113,6 +114,20 @@ TEST(MicaLossyHash, ReadAndWrite) {
   ASSERT_EQ(789, lossy_hash.Lookup(123456));
   ASSERT_EQ(-1, lossy_hash.Lookup(654321));
 }
+
+TEST(LossyIndex, ReadAndWrite) {
+  LossyIndex idx(1024, 256);
+  Entry entry("hello", "world");
+
+  idx.Insert(entry);
+
+  string value;
+  ASSERT_TRUE(idx.Read(entry.key, entry.hash, &value));
+  ASSERT_EQ(entry.value, value);
+
+  ASSERT_FALSE(idx.Read(entry.key, 0, &value));
+}
+
 
 int main(int argv, char** argc) {
   testing::InitGoogleTest(&argv, argc);
