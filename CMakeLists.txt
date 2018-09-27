@@ -21,3 +21,6 @@ target_compile_options(btree-test PRIVATE -g -O3)
 add_executable(mica-benchmark mica-benchmark.cc mica-log.cc)
 target_link_libraries(mica-benchmark benchmark)
 target_compile_options(mica-benchmark PRIVATE -g -O3)
+
+# target_compile_options(mica-benchmark PRIVATE -fsanitize=address)
+# target_link_libraries(mica-benchmark -fsanitize=address)

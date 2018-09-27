@@ -21,7 +21,7 @@ typedef int64_t offset_t;
 typedef int32_t entrysize_t;
 typedef int64_t space_t;
 typedef size_t keyhash_t;
-typedef int16_t tag_t;
+typedef uint16_t tag_t;
 
 class CircularLog {
  public:
@@ -111,6 +111,25 @@ class LossyIndex {
  private:
   LossyHash idx_;
   CircularLog log_;
+};
+
+class ChainedLossyHashIndex {
+ public:
+  ChainedLossyHashIndex(int num_buckets);
+  void Insert(const Entry& entry);
+  bool Read(const std::string& key, keyhash_t hash, std::string* value);
+ private:
+  struct Node {
+    Node* next = nullptr;
+    tag_t log_tag = 0;
+    std::string key;
+    std::string value;
+    int chain_len = 0;
+  };
+  int16_t num_buckets_ = 0;
+
+  Node** buckets_;
+
 };
 
 }

@@ -156,7 +156,7 @@ void Index::Insert(const Entry& entry) {
   // TODO: Could check if entry exists and use Update directly.
   offset_t offset = log_.Insert(entry.key, entry.value, entry.hash);
   tag_t bucket_tag = ExtractHashTag(entry.hash);
-  idx_[bucket_tag] = {entry.hash, -1};
+  idx_[bucket_tag] = {entry.hash, offset};
 }
 
 bool Index::Update(const Entry& entry) {
@@ -244,6 +244,49 @@ bool LossyIndex::Read(const std::string& key, keyhash_t hash, std::string* value
   if (!log_.ReadFrom(offset, hash, &stored_key, value)) return false;
 
   return (stored_key == key);
+}
+
+void ChainedLossyHashIndex::Insert(const Entry& entry) {
+  tag_t hash_tag = ExtractHashTag(entry.hash);
+  int16_t bucket_num = hash_tag % num_buckets_;
+
+  Node* node = new Node();
+  node->log_tag = ExtractLogTag(entry.hash);
+  node->key = entry.key;
+  node->value = entry.value;
+
+  Node* old = buckets_[bucket_num];
+  buckets_[bucket_num] = node;
+  node->next = old;
+  if (old) {
+    node->chain_len = std::min(14, old->chain_len + 1);
+    if (node->chain_len == 14) {
+      Node* cur = node;
+      while (cur->next->next) cur = cur->next;
+      delete cur->next;
+      cur->next = nullptr;
+    }
+  }
+}
+
+bool ChainedLossyHashIndex::Read(const string& key, keyhash_t hash, string* value) {
+  tag_t hash_tag = ExtractHashTag(hash);
+  tag_t log_tag = ExtractLogTag(hash);
+
+  Node* node = buckets_[hash_tag % num_buckets_];
+  while (node) {
+    if (node->log_tag == log_tag && node->key == key) {
+      *value = node->value;
+      return true;
+    }
+    node = node->next;
+  }
+  return false;
+}
+
+ChainedLossyHashIndex::ChainedLossyHashIndex(int num_buckets) : num_buckets_(num_buckets) {
+  buckets_ = new Node*[num_buckets_];
+  for (int i = 0; i < num_buckets_; ++i) buckets_[i] = nullptr;
 }
 
 }
