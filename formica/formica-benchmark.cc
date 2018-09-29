@@ -42,43 +42,96 @@ vector<Entry> RandomStrings(int n, int l) {
   return ret;
 }
 
-static void BM_IndexWrite(benchmark::State& state) {
-  Index idx(1024);
-  Entry entry(string(1024 * 16, 'a'), string(1024 * 16, 'b'));
-  for (auto _: state) {
-    idx.Insert(entry);
+template<typename T>
+class IndexFixture : public benchmark::Fixture {
+ public:
+  void DoReadThroughputBenchmark(benchmark::State& state) {
+    T idx(state.range(0), state.range(1));
+    vector<Entry> entries = RandomStrings(1024 * 1024, 32);
+    for (const auto& e: entries) {
+      idx.Insert(e);
+    }
+
+    for (auto _: state) {
+      string value;
+      const auto& entry = entries[rand() % entries.size()];
+      idx.Read(entry.key, entry.hash, &value);
+    }
   }
+
+  void DoWriteThroughputBenchmark(benchmark::State& state) {
+    auto entries = RandomStrings(1024 * 1024, 32);
+    T idx(state.range(0), state.range(1));
+    for (auto _: state) {
+      idx.Insert(entries[rand() % entries.size()]);
+    }
+  }
+};
+
+BENCHMARK_TEMPLATE_DEFINE_F(IndexFixture, IndexReadThroughput, Index)(benchmark::State& state) {
+  DoReadThroughputBenchmark(state);
+}
+BENCHMARK_TEMPLATE_DEFINE_F(IndexFixture, LossyIndexReadThroughput, LossyIndex)(benchmark::State& state) {
+  DoReadThroughputBenchmark(state);
+}
+// BENCHMARK_REGISTER_F(IndexFixture, IndexReadThroughput)->Args({1024 * 1024 * 128, 512});
+// BENCHMARK_REGISTER_F(IndexFixture, LossyIndexReadThroughput)->Args({1024 * 1024 * 128, 512});
+
+BENCHMARK_TEMPLATE_DEFINE_F(IndexFixture, IndexWriteThroughput, Index)(benchmark::State &state) {
+  DoWriteThroughputBenchmark(state);
 }
 
-static void BM_LossyIndexWrite(benchmark::State& state) {
-  LossyIndex idx(1024, 256);
-  Entry entry(string(1024 * 16, 'a'), string(1024 * 16, 'b'));
-  for (auto _: state) {
-    idx.Insert(entry);
-  }
+BENCHMARK_TEMPLATE_DEFINE_F(IndexFixture, LossyIndexWriteThroughput, LossyIndex)(benchmark::State &state) {
+  DoWriteThroughputBenchmark(state);
 }
 
-static void BM_IndexRead(benchmark::State& state) {
-  Entry entry("hello", "world");
-  Index idx(1024);
-  idx.Insert(entry);
-
-  for (auto _: state) {
-    string value;
-    idx.Read(entry.key, entry.hash, &value);
-  }
+BENCHMARK_TEMPLATE_DEFINE_F(IndexFixture, ChainedLossyIndexWriteThroughput, ChainedLossyHashIndex)(benchmark::State &state) {
+  DoWriteThroughputBenchmark(state);
 }
 
-static void BM_LossyIndexRead(benchmark::State& state) {
-  Entry entry("hello", "world");
-  LossyIndex idx(1024, 256);
-  idx.Insert(entry);
+// BENCHMARK_REGISTER_F(IndexFixture, IndexWriteThroughput)->Args({1024 * 1024 * 128, 512});
+// BENCHMARK_REGISTER_F(IndexFixture, LossyIndexWriteThroughput)->Args({1024 * 1024 * 128, 512});
 
-  for (auto _: state) {
-    string value;
-    idx.Read(entry.key, entry.hash, &value);
-  }
-}
+BENCHMARK_REGISTER_F(IndexFixture, ChainedLossyIndexWriteThroughput)->Args({1024 * 1024 * 128, 512});
+
+
+// static void BM_IndexWrite(benchmark::State& state) {
+//   Index idx(1024);
+//   Entry entry(string(1024 * 16, 'a'), string(1024 * 16, 'b'));
+//   for (auto _: state) {
+//     idx.Insert(entry);
+//   }
+// }
+
+// static void BM_LossyIndexWrite(benchmark::State& state) {
+//   LossyIndex idx(1024, 256);
+//   Entry entry(string(1024 * 16, 'a'), string(1024 * 16, 'b'));
+//   for (auto _: state) {
+//     idx.Insert(entry);
+//   }
+// }
+
+// static void BM_IndexRead(benchmark::State& state) {
+//   Entry entry("hello", "world");
+//   Index idx(1024);
+//   idx.Insert(entry);
+
+//   for (auto _: state) {
+//     string value;
+//     idx.Read(entry.key, entry.hash, &value);
+//   }
+// }
+
+// static void BM_LossyIndexRead(benchmark::State& state) {
+//   Entry entry("hello", "world");
+//   LossyIndex idx(1024, 256);
+//   idx.Insert(entry);
+
+//   for (auto _: state) {
+//     string value;
+//     idx.Read(entry.key, entry.hash, &value);
+//   }
+// }
 
 static void BM_RandomLossyIndexWrite(benchmark::State& state) {
   auto entries = RandomStrings(5000, state.range(0) * 1024);
@@ -109,6 +162,9 @@ static void BM_RandomLossyIndexRead(benchmark::State& state) {
   }
 
   state.counters["Num. hits"] = num_hits;
+  state.counters["Throughput"] =
+      benchmark::Counter(1024 * state.range(0), benchmark::Counter::kIsIterationInvariantRate,
+          benchmark::Counter::OneK::kIs1024);
 }
 
 static void BM_RandomIndexRead(benchmark::State& state) {
@@ -125,6 +181,9 @@ static void BM_RandomIndexRead(benchmark::State& state) {
   }
 
   state.counters["Num. hits"] = num_hits;
+  state.counters["Throughput"] =
+      benchmark::Counter(1024 * state.range(0), benchmark::Counter::kIsIterationInvariantRate,
+          benchmark::Counter::OneK::kIs1024);
 }
 
 static void BM_ChainedLossyHashIndexWrite(benchmark::State& state) {
@@ -148,6 +207,10 @@ static void BM_ChainedLossyHashIndexRead(benchmark::State& state) {
   }
 
   state.counters["Num. hits"] = num_hits;
+  // state.counters["Ops/s"] =
+  state.counters["Throughput"] =
+      benchmark::Counter(1024 * state.range(0), benchmark::Counter::kIsIterationInvariantRate,
+          benchmark::Counter::OneK::kIs1024);
 }
 
 // BENCHMARK(BM_IndexWrite);
@@ -158,10 +221,14 @@ static void BM_ChainedLossyHashIndexRead(benchmark::State& state) {
 // BENCHMARK(BM_RandomLossyIndexWrite)->Arg(4); //->Arg(1)->Arg(2)->Arg(4)->Arg(8)->Arg(16);
 // BENCHMARK(BM_RandomIndexWrite)->Arg(4); //->Arg(1)->Arg(2)->Arg(4)->Arg(8)->Arg(16);
 
-BENCHMARK(BM_RandomIndexRead)->Arg(4); //->Arg(1)->Arg(2)->Arg(4)->Arg(8)->Arg(16);
-BENCHMARK(BM_RandomLossyIndexRead)->Arg(4); //->Arg(1)->Arg(2)->Arg(4)->Arg(8)->Arg(16);
+// BENCHMARK(BM_RandomIndexRead)->Arg(1)->Arg(2)->Arg(4)->Arg(8)->Arg(16);
+// BENCHMARK(BM_RandomLossyIndexRead)->Arg(1)->Arg(2)->Arg(4)->Arg(8)->Arg(16);
+
+// BENCHMARK(BM_RandomIndexRead)->Arg(4)->Threads(4);
+// BENCHMARK(BM_RandomLossyIndexRead)->Arg(4)->Threads(4);
 
 // BENCHMARK(BM_ChainedLossyHashIndexWrite)->Arg(4);
-BENCHMARK(BM_ChainedLossyHashIndexRead)->Arg(4);
+// BENCHMARK(BM_ChainedLossyHashIndexRead)->Arg(1)->Arg(2)->Arg(4)->Arg(8)->Arg(16);
+// BENCHMARK(BM_ChainedLossyHashIndexRead)->Arg(4)->Threads(4);
 
 BENCHMARK_MAIN();

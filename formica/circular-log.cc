@@ -117,7 +117,6 @@ bool CircularLog::ReadFrom(offset_t offset, keyhash_t expected, string* key, str
   assert(offset < size_);
   EntryHeader* header = reinterpret_cast<EntryHeader*>(bufptr_ + offset);
   if (header->tag != ExtractLogTag(expected)) {
-    cout << "Expected tag: " << ExtractLogTag(expected) << ", but got: " << header->tag << endl;
     return false;
   }
   offset_t keystart = offset + sizeof(EntryHeader);

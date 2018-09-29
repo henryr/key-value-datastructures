@@ -125,17 +125,22 @@ void ChainedLossyHashIndex::Insert(const Entry& entry) {
   node->key = entry.key;
   node->value = entry.value;
 
-  Node* old = buckets_[bucket_num];
-  buckets_[bucket_num] = node;
+  Bucket* bucket = &(buckets_[bucket_num]);
+  Node* old = bucket->first;
+  bucket->first = node;
   node->next = old;
+  ++bucket->chain_len;
+
   if (old) {
-    node->chain_len = std::min(14, old->chain_len + 1);
-    if (node->chain_len == 14) {
-      Node* cur = node;
-      while (cur->next->next) cur = cur->next;
-      delete cur->next;
-      cur->next = nullptr;
-    }
+    old->prev = node;
+  } else {
+    bucket->last = node;
+  }
+
+  if (bucket->chain_len == 14) {
+    Node* new_last = bucket->last->prev;
+    delete bucket->last;
+    bucket->last = new_last;
   }
 }
 
@@ -143,7 +148,7 @@ bool ChainedLossyHashIndex::Read(const string& key, keyhash_t hash, string* valu
   tag_t hash_tag = ExtractHashTag(hash);
   tag_t log_tag = ExtractLogTag(hash);
 
-  Node* node = buckets_[hash_tag % num_buckets_];
+  Node* node = buckets_[hash_tag % num_buckets_].first;
   while (node) {
     if (node->log_tag == log_tag && node->key == key) {
       *value = node->value;
@@ -155,14 +160,13 @@ bool ChainedLossyHashIndex::Read(const string& key, keyhash_t hash, string* valu
 }
 
 ChainedLossyHashIndex::ChainedLossyHashIndex(int num_buckets) : num_buckets_(num_buckets) {
-  buckets_ = new Node*[num_buckets_];
-  for (int i = 0; i < num_buckets_; ++i) buckets_[i] = nullptr;
+  buckets_ = new Bucket[num_buckets_];
 }
 
 ChainedLossyHashIndex::~ChainedLossyHashIndex() {
   if (buckets_ == nullptr) return;
   for (int i = 0; i < num_buckets_; ++i) {
-    Node* node = buckets_[i];
+    Node* node = buckets_[i].first;
     Node* next = nullptr;
     while (node) {
       next = node->next;

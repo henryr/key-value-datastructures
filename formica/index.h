@@ -20,6 +20,9 @@ class Index {
  public:
   Index(space_t size);
 
+  // For compatibility
+  Index(space_t size, int16_t dummy) : Index(size) { }
+
   void Insert(const Entry& entry);
   bool Update(const Entry& entry);
   void Delete(const std::string& key);
@@ -77,6 +80,8 @@ class LossyIndex {
 class ChainedLossyHashIndex {
  public:
   ChainedLossyHashIndex(int num_buckets);
+  ChainedLossyHashIndex(space_t dummy, int num_buckets) : ChainedLossyHashIndex(num_buckets) { }
+
   void Insert(const Entry& entry);
   bool Read(const std::string& key, keyhash_t hash, std::string* value);
 
@@ -85,14 +90,21 @@ class ChainedLossyHashIndex {
  private:
   struct Node {
     Node* next = nullptr;
+    Node* prev = nullptr;
     tag_t log_tag = 0;
     std::string key;
     std::string value;
+  };
+
+  struct Bucket {
+    Node* first = nullptr;
+    Node* last = nullptr;
     int chain_len = 0;
   };
+
   int16_t num_buckets_ = 0;
 
-  Node** buckets_ = nullptr;
+  Bucket* buckets_ = nullptr;
 
 };
 
