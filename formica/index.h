@@ -28,9 +28,19 @@ class Index {
   void Delete(const std::string& key);
   bool Read(const std::string& key, keyhash_t hash, std::string* value);
 
+  void DebugDump();
+
+  int index_misses() { return index_misses_; }
+  int log_overwritten() { return log_overwritten_; }
+  int log_other_key() { return log_other_key_; }
+
+
  private:
   CircularLog log_;
   std::unordered_map<tag_t, std::pair<keyhash_t, offset_t>> idx_;
+  int index_misses_ = 0;
+  int log_overwritten_ = 0;
+  int log_other_key_ = 0;
 };
 
 class LossyHash {
@@ -72,9 +82,18 @@ class LossyIndex {
   void Delete(const std::string& key);
   bool Read(const std::string& key, keyhash_t hash, std::string* value);
 
+  void DebugDump();
+
+  int index_misses() { return index_misses_; }
+  int log_overwritten() { return log_overwritten_; }
+  int log_other_key() { return log_other_key_; }
+
  private:
   LossyHash idx_;
   CircularLog log_;
+  int index_misses_ = 0;
+  int log_overwritten_ = 0;
+  int log_other_key_ = 0;
 };
 
 class ChainedLossyHashIndex {
@@ -85,9 +104,20 @@ class ChainedLossyHashIndex {
   void Insert(const Entry& entry);
   bool Read(const std::string& key, keyhash_t hash, std::string* value);
 
+  void DebugDump();
+
+  int index_misses() { return index_misses_; }
+  int log_overwritten() { return log_overwritten_; }
+  int log_other_key() { return log_other_key_; }
+
+
   ~ChainedLossyHashIndex();
 
  private:
+  int index_misses_ = 0;
+  int log_overwritten_ = 0;
+  int log_other_key_ = 0;
+
   struct Node {
     Node* next = nullptr;
     Node* prev = nullptr;

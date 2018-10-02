@@ -13,7 +13,10 @@
 #include "index.h"
 
 #include "benchmark/benchmark.h"
+#include <iostream>
 
+using std::cout;
+using std::endl;
 using std::string;
 using std::hash;
 using std::vector;
@@ -32,22 +35,29 @@ string RandomString(int l) {
   return ret;
 }
 
-vector<Entry> RandomStrings(int n, int l) {
+vector<Entry> RandomStrings(int n, int l, int l2) {
+  cout << "Creating " << n * 2 << " random strings" << endl;
   srand(0);
   vector<Entry> ret;
 
   for (int i = 0; i < n; ++i) {
-    ret.push_back(Entry(RandomString(l), RandomString(l)));
+    ret.push_back(Entry(RandomString(l), RandomString(l2)));
   }
+  cout << "Strings done" << endl;
   return ret;
 }
+
+static constexpr int KEY_SIZE = 16;
+static constexpr int VALUE_SIZE = 64;
+static constexpr int NUM_ENTRIES = 14 * 4096;
+static vector<Entry> entries = RandomStrings(NUM_ENTRIES, KEY_SIZE, VALUE_SIZE);
+static vector<Entry> warm_up_entries = RandomStrings(NUM_ENTRIES, KEY_SIZE, VALUE_SIZE);
 
 template<typename T>
 class IndexFixture : public benchmark::Fixture {
  public:
   void DoReadThroughputBenchmark(benchmark::State& state) {
     T idx(state.range(0), state.range(1));
-    vector<Entry> entries = RandomStrings(1024 * 1024, 32);
     for (const auto& e: entries) {
       idx.Insert(e);
     }
@@ -60,11 +70,49 @@ class IndexFixture : public benchmark::Fixture {
   }
 
   void DoWriteThroughputBenchmark(benchmark::State& state) {
-    auto entries = RandomStrings(1024 * 1024, 32);
     T idx(state.range(0), state.range(1));
     for (auto _: state) {
       idx.Insert(entries[rand() % entries.size()]);
     }
+  }
+
+  void DoMixedWorkloadBenchmark(benchmark::State& state) {
+    T idx(state.range(0), state.range(1));
+    srand(0);
+
+    constexpr int NUM_OPS = 10 * 1024 * 1024; // * 1024 * 10;
+    // Warm up the index:
+
+    // 2M strings
+    for (const auto& e: warm_up_entries) idx.Insert(e);
+
+    int put_cursor = 0;
+    int get_counter = 0;
+    int misses = 0;
+    for (auto _: state) {
+      for (int i = 0; i < NUM_OPS; ++i) {
+        // State.range(2) == chance out of 100 that we do a PUT
+        if (rand() % 100 < state.range(2)) {
+          // Do PUT
+          idx.Insert(entries[(put_cursor++) % entries.size()]);
+        } else {
+          // Do GET
+          const Entry& e = warm_up_entries[rand() % warm_up_entries.size()];
+          string value;
+          if (!idx.Read(e.key, e.hash, &value)) ++misses;
+          ++get_counter;
+        }
+      }
+    }
+
+    state.counters["GETS"] = get_counter;
+    // state.counters["PUTS"] = put_cursor;
+    //    state.counters["Hit ratio"] = (get_counter - misses) / (1.0 * get_counter);
+    state.counters["Num misses"] = misses;
+    state.counters["Overwritten"] = idx.log_overwritten();
+    state.counters["Index misses"] = idx.index_misses();
+    state.counters["Other key"] = idx.log_other_key();
+    // state.counters["Ops. /s"] = benchmark::Counter(get_counter + put_cursor,  benchmark::Counter::kIsRate);
   }
 };
 
@@ -89,11 +137,36 @@ BENCHMARK_TEMPLATE_DEFINE_F(IndexFixture, ChainedLossyIndexWriteThroughput, Chai
   DoWriteThroughputBenchmark(state);
 }
 
+BENCHMARK_TEMPLATE_DEFINE_F(IndexFixture, LossyIndexMixedWorkloadThroughput, LossyIndex)(benchmark::State& state) {
+  DoMixedWorkloadBenchmark(state);
+}
+
+BENCHMARK_TEMPLATE_DEFINE_F(IndexFixture, IndexMixedWorkloadThroughput, Index)(benchmark::State& state) {
+  DoMixedWorkloadBenchmark(state);
+}
+
+BENCHMARK_TEMPLATE_DEFINE_F(IndexFixture, ChainedLossyIndexMixedWorkloadThroughput, ChainedLossyHashIndex)(benchmark::State& state) {
+  DoMixedWorkloadBenchmark(state);
+}
+
 // BENCHMARK_REGISTER_F(IndexFixture, IndexWriteThroughput)->Args({1024 * 1024 * 128, 512});
 // BENCHMARK_REGISTER_F(IndexFixture, LossyIndexWriteThroughput)->Args({1024 * 1024 * 128, 512});
+// BENCHMARK_REGISTER_F(IndexFixture, ChainedLossyIndexWriteThroughput)->Args({1024 * 1024 * 128, 512});
 
-BENCHMARK_REGISTER_F(IndexFixture, ChainedLossyIndexWriteThroughput)->Args({1024 * 1024 * 128, 512});
+BENCHMARK_REGISTER_F(IndexFixture, LossyIndexMixedWorkloadThroughput)->
+    Args({1024 * 1024 * 128, 512, 5})->Unit(benchmark::kMillisecond);
+BENCHMARK_REGISTER_F(IndexFixture, IndexMixedWorkloadThroughput)->
+    Args({1024 * 1024 * 128, 512, 5})->Unit(benchmark::kMillisecond);
+BENCHMARK_REGISTER_F(IndexFixture, ChainedLossyIndexMixedWorkloadThroughput)->
+    Args({1024 * 1024 * 128, 512, 5})->Unit(benchmark::kMillisecond);
 
+
+BENCHMARK_REGISTER_F(IndexFixture, LossyIndexMixedWorkloadThroughput)->
+    Args({1024 * 1024 * 128, 4096, 50})->Unit(benchmark::kMillisecond);
+BENCHMARK_REGISTER_F(IndexFixture, IndexMixedWorkloadThroughput)->
+    Args({1024 * 1024 * 128, 4096, 50})->Unit(benchmark::kMillisecond);
+BENCHMARK_REGISTER_F(IndexFixture, ChainedLossyIndexMixedWorkloadThroughput)->
+    Args({1024 * 1024 * 128, 4096, 50})->Unit(benchmark::kMillisecond);
 
 // static void BM_IndexWrite(benchmark::State& state) {
 //   Index idx(1024);
@@ -134,7 +207,7 @@ BENCHMARK_REGISTER_F(IndexFixture, ChainedLossyIndexWriteThroughput)->Args({1024
 // }
 
 static void BM_RandomLossyIndexWrite(benchmark::State& state) {
-  auto entries = RandomStrings(5000, state.range(0) * 1024);
+  auto entries = RandomStrings(5000, state.range(0) * 1024, state.range(0) * 1024);
   LossyIndex idx(10 * 1024 * 1024, 256);
   for (auto _: state) {
     idx.Insert(entries[rand() % 5000]);
@@ -142,7 +215,7 @@ static void BM_RandomLossyIndexWrite(benchmark::State& state) {
 }
 
 static void BM_RandomIndexWrite(benchmark::State& state) {
-  auto entries = RandomStrings(5000, state.range(0) * 1024);
+  auto entries = RandomStrings(5000, state.range(0) * 1024, state.range(0) * 1024);
   Index idx(10 * 1024 * 1024);
   for (auto _: state) {
     idx.Insert(entries[rand() % 5000]);
@@ -150,7 +223,7 @@ static void BM_RandomIndexWrite(benchmark::State& state) {
 }
 
 static void BM_RandomLossyIndexRead(benchmark::State& state) {
-  auto entries = RandomStrings(5000, state.range(0) * 1024);
+  auto entries = RandomStrings(5000, state.range(0) * 1024, state.range(0) * 1024);
   LossyIndex idx(10 * 1024 * 1024, 256);
 
   for (const auto& e: entries) idx.Insert(e);
@@ -168,7 +241,7 @@ static void BM_RandomLossyIndexRead(benchmark::State& state) {
 }
 
 static void BM_RandomIndexRead(benchmark::State& state) {
-  auto entries = RandomStrings(5000, state.range(0) * 1024);
+  auto entries = RandomStrings(5000, state.range(0) * 1024, state.range(0) * 1024);
   Index idx(10 * 1024 * 1024);
 
   for (const auto& e: entries) idx.Insert(e);
@@ -187,7 +260,7 @@ static void BM_RandomIndexRead(benchmark::State& state) {
 }
 
 static void BM_ChainedLossyHashIndexWrite(benchmark::State& state) {
-  auto entries = RandomStrings(5000, state.range(0) * 1024);
+  auto entries = RandomStrings(5000, state.range(0) * 1024, state.range(0) * 1024);
   ChainedLossyHashIndex idx(256);
   for (auto _: state) {
     idx.Insert(entries[rand() % 5000]);
@@ -195,7 +268,7 @@ static void BM_ChainedLossyHashIndexWrite(benchmark::State& state) {
 }
 
 static void BM_ChainedLossyHashIndexRead(benchmark::State& state) {
-  auto entries = RandomStrings(5000, state.range(0) * 1024);
+  auto entries = RandomStrings(5000, state.range(0) * 1024, state.range(0) * 1024);
   ChainedLossyHashIndex idx(256);
   for (const auto& e: entries) idx.Insert(e);
 

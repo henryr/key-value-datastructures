@@ -11,6 +11,7 @@ link_directories(${CMAKE_SOURCE_DIR}/thirdparty/google-benchmark/lib/)
 add_library(formica
   formica/index.cc
   formica/circular-log.cc)
+target_compile_options(formica PRIVATE -g -O3)
 
 add_executable(formica-test formica/formica-test.cc)
 target_link_libraries(formica-test formica gtest pthread)

@@ -45,13 +45,23 @@ void Index::Delete(const string& key) {
 
 bool Index::Read(const std::string& key, keyhash_t hash, std::string* value) {
   auto it = idx_.find(ExtractHashTag(hash));
-  if (it == idx_.end()) return false;
+  if (it == idx_.end()) {
+    ++index_misses_;
+    return false;
+  }
 
   string stored_key;
-  if (!log_.ReadFrom(it->second.second, hash, &stored_key, value)) return false;
+  if (!log_.ReadFrom(it->second.second, hash, &stored_key, value)) {
+    ++log_overwritten_;
+    return false;
+  }
 
   // This is the only time that the key is completely compared to the requested one.
-  return key == stored_key;
+  if (key != stored_key) {
+    ++log_other_key_;
+    return false;
+  }
+  return true;
 }
 
 LossyHash::LossyHash(int16_t num_buckets) : num_buckets_(num_buckets) {
@@ -120,27 +130,29 @@ void ChainedLossyHashIndex::Insert(const Entry& entry) {
   tag_t hash_tag = ExtractHashTag(entry.hash);
   int16_t bucket_num = hash_tag % num_buckets_;
 
-  Node* node = new Node();
+  Bucket* bucket = &(buckets_[bucket_num]);
+  Node* old = bucket->first;
+
+  Node* node = bucket->chain_len == 14 ? bucket->last : new Node();
   node->log_tag = ExtractLogTag(entry.hash);
   node->key = entry.key;
   node->value = entry.value;
 
-  Bucket* bucket = &(buckets_[bucket_num]);
-  Node* old = bucket->first;
+  if (bucket->chain_len == 14) {
+    node->prev->next = nullptr;
+    bucket->last = node->prev;
+    node->prev = nullptr;
+  } else {
+    ++bucket->chain_len;
+  }
+
   bucket->first = node;
   node->next = old;
-  ++bucket->chain_len;
 
   if (old) {
     old->prev = node;
   } else {
     bucket->last = node;
-  }
-
-  if (bucket->chain_len == 14) {
-    Node* new_last = bucket->last->prev;
-    delete bucket->last;
-    bucket->last = new_last;
   }
 }
 
