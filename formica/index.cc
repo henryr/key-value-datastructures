@@ -20,17 +20,17 @@ using std::string;
 using std::cout;
 using std::endl;
 
-Index::Index(space_t size) : log_(size) { }
+StdMapStore::StdMapStore(space_t size) : log_(size) { }
 
-void Index::Insert(const Entry& entry) {
+void StdMapStore::Insert(const Entry& entry) {
   // TODO: Could check if entry exists and use Update directly.
   offset_t offset = log_.Insert(entry.key, entry.value, entry.hash);
-  tag_t bucket_tag = ExtractHashTag(entry.hash);
-  idx_[bucket_tag] = {entry.hash, offset};
+  //  tag_t bucket_tag = ExtractHashTag(entry.hash);
+  idx_[entry.key] = {entry.hash, offset};
 }
 
-bool Index::Update(const Entry& entry) {
-  auto it = idx_.find(ExtractHashTag(entry.hash));
+bool StdMapStore::Update(const Entry& entry) {
+  auto it = idx_.find(entry.key); // ExtractHashTag(entry.hash));
   if (it == idx_.end()) return false;
 
   offset_t offset = log_.Update(it->second.second, entry.key, entry.value, entry.hash);
@@ -39,12 +39,12 @@ bool Index::Update(const Entry& entry) {
   return true;
 }
 
-void Index::Delete(const string& key) {
+void StdMapStore::Delete(const string& key) {
   // idx_.erase(ExtractHashTag(key);
 }
 
-bool Index::Read(const std::string& key, keyhash_t hash, std::string* value) {
-  auto it = idx_.find(ExtractHashTag(hash));
+bool StdMapStore::Read(const std::string& key, keyhash_t hash, std::string* value) {
+  auto it = idx_.find(key); // ExtractHashTag(hash));
   if (it == idx_.end()) {
     ++index_misses_;
     return false;
@@ -64,7 +64,7 @@ bool Index::Read(const std::string& key, keyhash_t hash, std::string* value) {
   return true;
 }
 
-LossyHash::LossyHash(int16_t num_buckets) : num_buckets_(num_buckets) {
+LossyHash::LossyHash(bucket_count_t num_buckets) : num_buckets_(num_buckets) {
   buckets_ = new Bucket[num_buckets];
 }
 
@@ -103,42 +103,54 @@ void LossyHash::Insert(keyhash_t hash, offset_t offset, offset_t log_tail) {
   bucket->entries[entry_idx] = {log_tag, offset};
 }
 
-LossyIndex::LossyIndex(space_t size, int16_t num_buckets) : idx_(num_buckets), log_(size) { }
+FormicaStore::FormicaStore(space_t size, bucket_count_t num_buckets) : idx_(num_buckets), log_(size) { }
 
-void LossyIndex::Insert(const Entry& entry) {
+void FormicaStore::Insert(const Entry& entry) {
   offset_t offset = log_.Insert(entry.key, entry.value, entry.hash);
   idx_.Insert(entry.hash, offset, -1);
 }
 
-bool LossyIndex::Update(const Entry& entry) {
+bool FormicaStore::Update(const Entry& entry) {
   // TODO - need to refactor because we want to avoid double lookup in the hash to find the offset
   // and then rewrite it.
   return false;
 }
 
-bool LossyIndex::Read(const std::string& key, keyhash_t hash, std::string* value) {
+bool FormicaStore::Read(const std::string& key, keyhash_t hash, std::string* value) {
   offset_t offset = idx_.Lookup(hash);
-  if (offset == -1) return false;
+  if (offset == -1) {
+    ++index_misses_;
+    return false;
+  }
 
   string stored_key;
-  if (!log_.ReadFrom(offset, hash, &stored_key, value)) return false;
+  if (!log_.ReadFrom(offset, hash, &stored_key, value)) {
+    ++log_overwritten_;
+    return false;
+  }
 
-  return (stored_key == key);
+  if (stored_key != key) {
+    ++log_other_key_;
+    return false;
+  }
+  return true;
 }
 
-void ChainedLossyHashIndex::Insert(const Entry& entry) {
+static constexpr int CHAIN_LENGTH = 32;
+
+void ChainedLossyHashStore::Insert(const Entry& entry) {
   tag_t hash_tag = ExtractHashTag(entry.hash);
-  int16_t bucket_num = hash_tag % num_buckets_;
+  bucket_count_t bucket_num = hash_tag % num_buckets_;
 
   Bucket* bucket = &(buckets_[bucket_num]);
   Node* old = bucket->first;
 
-  Node* node = bucket->chain_len == 14 ? bucket->last : new Node();
+  Node* node = bucket->chain_len == CHAIN_LENGTH ? bucket->last : new Node();
   node->log_tag = ExtractLogTag(entry.hash);
   node->key = entry.key;
   node->value = entry.value;
 
-  if (bucket->chain_len == 14) {
+  if (bucket->chain_len == CHAIN_LENGTH) {
     node->prev->next = nullptr;
     bucket->last = node->prev;
     node->prev = nullptr;
@@ -156,7 +168,7 @@ void ChainedLossyHashIndex::Insert(const Entry& entry) {
   }
 }
 
-bool ChainedLossyHashIndex::Read(const string& key, keyhash_t hash, string* value) {
+bool ChainedLossyHashStore::Read(const string& key, keyhash_t hash, string* value) {
   tag_t hash_tag = ExtractHashTag(hash);
   tag_t log_tag = ExtractLogTag(hash);
 
@@ -171,11 +183,11 @@ bool ChainedLossyHashIndex::Read(const string& key, keyhash_t hash, string* valu
   return false;
 }
 
-ChainedLossyHashIndex::ChainedLossyHashIndex(int num_buckets) : num_buckets_(num_buckets) {
+ChainedLossyHashStore::ChainedLossyHashStore(int num_buckets) : num_buckets_(num_buckets) {
   buckets_ = new Bucket[num_buckets_];
 }
 
-ChainedLossyHashIndex::~ChainedLossyHashIndex() {
+ChainedLossyHashStore::~ChainedLossyHashStore() {
   if (buckets_ == nullptr) return;
   for (int i = 0; i < num_buckets_; ++i) {
     Node* node = buckets_[i].first;

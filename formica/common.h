@@ -21,7 +21,7 @@ typedef int64_t offset_t;
 typedef int32_t entrysize_t;
 typedef int64_t space_t;
 typedef size_t keyhash_t;
-typedef uint16_t tag_t;
+typedef uint32_t tag_t;
 
 struct Entry {
  public:
@@ -35,11 +35,11 @@ struct Entry {
 };
 
 inline tag_t ExtractLogTag(keyhash_t hash) {
-  return static_cast<int16_t>(0x000000000000FFFF & hash);
+  return static_cast<tag_t>(0x00000000FFFFFFFF & hash);
 }
 
 inline tag_t ExtractHashTag(keyhash_t hash) {
-  return static_cast<int16_t>(0x000000000000FFFF & (hash >> 16));
+  return static_cast<tag_t>(0x00000000FFFFFFFF & (hash >> 32));
 }
 
 }

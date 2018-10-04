@@ -17,9 +17,9 @@ using std::string;
 using std::hash;
 using formica::CircularLog;
 using formica::Entry;
-using formica::Index;
+using formica::StdMapStore;
 using formica::LossyHash;
-using formica::LossyIndex;
+using formica::FormicaStore;
 using formica::offset_t;
 
 TEST(CircularLog, SmokeTest) {
@@ -101,8 +101,8 @@ TEST(CircularLog, WorkloadTest) {
   }
 }
 
-TEST(Index, ReadAndWrite) {
-  Index idx(1024);
+TEST(StdMapStore, ReadAndWrite) {
+  StdMapStore idx(1024);
   Entry entry("hello", "world");
 
   idx.Insert(entry);
@@ -123,8 +123,8 @@ TEST(LossyHash, ReadAndWrite) {
   ASSERT_EQ(-1, lossy_hash.Lookup(654321));
 }
 
-TEST(LossyIndex, ReadAndWrite) {
-  LossyIndex idx(1024, 256);
+TEST(FormicaStore, ReadAndWrite) {
+  FormicaStore idx(1024, 256);
   Entry entry("hello", "world");
 
   idx.Insert(entry);

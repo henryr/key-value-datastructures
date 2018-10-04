@@ -116,7 +116,7 @@ void CircularLog::ReadString(offset_t offset, entrysize_t len, string* s) {
 bool CircularLog::ReadFrom(offset_t offset, keyhash_t expected, string* key, string* value) {
   assert(offset < size_);
   EntryHeader* header = reinterpret_cast<EntryHeader*>(bufptr_ + offset);
-  if (header->tag != ExtractLogTag(expected)) {
+  if (header->tag != ExtractLogTag(expected) || header->delimiter != '!') {
     return false;
   }
   offset_t keystart = offset + sizeof(EntryHeader);
