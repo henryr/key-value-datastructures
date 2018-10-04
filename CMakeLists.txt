@@ -9,7 +9,7 @@ include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/thirdparty/google-benchmark/inclu
 link_directories(${CMAKE_SOURCE_DIR}/thirdparty/google-benchmark/lib/)
 
 add_library(formica
-  formica/index.cc
+  formica/store.cc
   formica/circular-log.cc)
 target_compile_options(formica PRIVATE -g -O3)
 

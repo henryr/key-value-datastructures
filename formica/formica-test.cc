@@ -10,7 +10,7 @@
 // or implied.  See the License for the specific language governing permissions and limitations
 // under the License.
 
-#include "index.h"
+#include "store.h"
 #include "gtest/gtest.h"
 
 using std::string;
