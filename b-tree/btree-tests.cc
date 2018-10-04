@@ -1,3 +1,15 @@
+// Copyright 2018 Henry Robinson
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+// in compliance with the License.  You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software distributed under the License
+// is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+// or implied.  See the License for the specific language governing permissions and limitations
+// under the License.
+
 #include "gtest/gtest.h"
 #include "btree.h"
 
@@ -146,11 +158,7 @@ TEST(BTree, Insert) {
   }
 }
 
-int main(int argc, char **argv) {
-      ::testing::InitGoogleTest(&argc, argv);
-   return RUN_ALL_TESTS();
-
-  //  int main(int argv, char** argc) {
+void DoBenchmark() {
   using namespace std::chrono;
   BTree btree(100);
   int NUM_ENTRIES = 10000000;
@@ -180,4 +188,9 @@ int main(int argc, char **argv) {
   cout << "Searching for " << NUM_ENTRIES << " elements took " << time_span.count()
        << "s, at rate of " << (NUM_ENTRIES / time_span.count()) << " elements/s" << endl;
 
+}
+
+int main(int argc, char **argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }

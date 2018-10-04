@@ -1,5 +1,5 @@
 # Copyright 2018 Henry Robinson
-
+#
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License.  You may obtain a copy of the License at
 #
@@ -29,15 +29,14 @@ add_executable(formica-test formica/formica-test.cc)
 target_link_libraries(formica-test formica gtest pthread)
 target_compile_options(formica-test PRIVATE -g -O3)
 
-add_executable(btree-test btree-tests.cc btree.cc)
+add_executable(formica-benchmark formica/formica-benchmark.cc)
+target_link_libraries(formica-benchmark formica benchmark)
+target_compile_options(formica-benchmark PRIVATE -g -O3)
+# target_compile_options(formica-benchmark PRIVATE -fsanitize=address)
+# target_link_libraries(formica-benchmark -fsanitize=address)
+
+add_executable(btree-test b-tree/btree-tests.cc b-tree/btree.cc)
 target_link_libraries(btree-test gtest pthread)
 target_compile_options(btree-test PRIVATE -g -O3)
 # target_compile_options(btree-test PRIVATE -fsanitize=address)
 # target_link_libraries(btree-test -fsanitize=address)
-
-add_executable(formica-benchmark formica/formica-benchmark.cc)
-target_link_libraries(formica-benchmark formica benchmark)
-target_compile_options(formica-benchmark PRIVATE -g -O3)
-
-# target_compile_options(formica-benchmark PRIVATE -fsanitize=address)
-# target_link_libraries(formica-benchmark -fsanitize=address)
