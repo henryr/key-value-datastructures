@@ -69,12 +69,15 @@ class LossyHash {
     offset_t offset = -1;
   };
   struct Bucket {
-    // sizeof(Entry) == 10 right now, so to copy the paper and fit into two cache lines we have 128 /
-    // 9 == 14 entries per bucket. The paper says they have 15 entries per bucket, so their entry
+    // sizeof(Entry) == 12 right now, so to copy the paper and fit into two cache lines we have 128
+    // / 12 == 10 entries per bucket. The paper says they have 15 entries per bucket, so their entry
     // must be smaller. Perhaps they are using 56-bit offsets and packing everything into a 64-bit
     // Entry? That would fit directly into 128 bytes, but they need to save some space for the
-    // version field.
-    static constexpr int8_t NUM_ENTRIES = 25;
+    // version field, which we don't have.
+    //
+    // Right now this is tweaked so that the benchmark runs don't have any misses, and so this is
+    // about 4.5 cache lines.
+    static constexpr int8_t NUM_ENTRIES = 24;
     Entry entries[NUM_ENTRIES];
     int32_t padding;
     int16_t padding2;
@@ -84,6 +87,7 @@ class LossyHash {
   Bucket* buckets_;
 };
 
+// FormicaStore uses a LossyHash to index a CircularLog.
 class FormicaStore {
  public:
   FormicaStore(space_t size, bucket_count_t num_buckets);
@@ -107,10 +111,14 @@ class FormicaStore {
   int log_other_key_ = 0;
 };
 
+// The ChainedLossyHashStore uses a traditional linear-chained hash table to both index and store
+// (key, value) pairs. The length of a chain is limited and evicted FIFO, mimicing the eviction
+// logic of the FormicaStore.
 class ChainedLossyHashStore {
  public:
   ChainedLossyHashStore(int num_buckets);
   ChainedLossyHashStore(space_t dummy, int num_buckets) : ChainedLossyHashStore(num_buckets) { }
+  ~ChainedLossyHashStore();
 
   void Insert(const Entry& entry);
   bool Read(const std::string& key, keyhash_t hash, std::string* value);
@@ -118,16 +126,12 @@ class ChainedLossyHashStore {
   void DebugDump();
 
   int index_misses() { return index_misses_; }
-  int log_overwritten() { return log_overwritten_; }
-  int log_other_key() { return log_other_key_; }
-
-
-  ~ChainedLossyHashStore();
+  int log_overwritten() { return 0; }
+  int log_other_key() { return 0; }
 
  private:
   int index_misses_ = 0;
-  int log_overwritten_ = 0;
-  int log_other_key_ = 0;
+  static constexpr int MAX_CHAIN_LENGTH = 24;
 
   struct Node {
     Node* next = nullptr;
@@ -146,7 +150,6 @@ class ChainedLossyHashStore {
   bucket_count_t num_buckets_ = 0;
 
   Bucket* buckets_ = nullptr;
-
 };
 
 }

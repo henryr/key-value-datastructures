@@ -21,13 +21,10 @@ using std::string;
 using std::hash;
 using std::vector;
 using std::pair;
-using formica::CircularLog;
 using formica::Entry;
 using formica::StdMapStore;
-using formica::LossyHash;
 using formica::FormicaStore;
 using formica::ChainedLossyHashStore;
-using formica::offset_t;
 
 string RandomString(int l) {
   string ret(l, 'a');
@@ -41,53 +38,35 @@ vector<Entry> RandomStrings(int n, int l, int l2) {
   vector<Entry> ret;
 
   for (int i = 0; i < n; ++i) {
-    ret.push_back(Entry(
-            RandomString(16), // string(16, 'a' + (rand() % 25)),
-            string(64,'b'))); ////Entry(RandomString(l), RandomString(l2)));
+    ret.push_back(Entry(RandomString(l), string(l2,'b')));
   }
   cout << "Strings done" << endl;
   return ret;
 }
 
-static constexpr int KEY_SIZE = 128;
-static constexpr int VALUE_SIZE = 1024;
-static constexpr int NUM_ENTRIES = 1024 * 1024 * 2;
-static vector<Entry> entries = RandomStrings(NUM_ENTRIES, KEY_SIZE, VALUE_SIZE);
-static vector<Entry> warm_up_entries = RandomStrings(NUM_ENTRIES, KEY_SIZE, VALUE_SIZE);
+static constexpr int KEY_SIZE = 64;
+static constexpr int VALUE_SIZE = 128;
+static constexpr int NUM_ENTRIES = 1024 * 1024;
+static vector<Entry> ENTRIES = RandomStrings(NUM_ENTRIES, KEY_SIZE, VALUE_SIZE);
+static vector<Entry> INITIAL_ENTRIES = RandomStrings(NUM_ENTRIES, KEY_SIZE, VALUE_SIZE);
+
+static constexpr int64_t LOG_SIZE_BYTES = 1024 * 1024 * (KEY_SIZE + VALUE_SIZE + 100) * 2;
 
 template<typename T>
-class IndexFixture : public benchmark::Fixture {
+class StoreBMFixture : public benchmark::Fixture {
  public:
-  void DoReadThroughputBenchmark(benchmark::State& state) {
-    T idx(state.range(0), state.range(1));
-    for (const auto& e: entries) {
-      idx.Insert(e);
-    }
-
-    for (auto _: state) {
-      string value;
-      const auto& entry = entries[rand() % entries.size()];
-      idx.Read(entry.key, entry.hash, &value);
-    }
-  }
-
-  void DoWriteThroughputBenchmark(benchmark::State& state) {
-    T idx(state.range(0), state.range(1));
-    for (auto _: state) {
-      idx.Insert(entries[rand() % entries.size()]);
-    }
-  }
-
+  // Benchmark a workload with some mixture of GETs and PUTs. The store is warmed up with puts from
+  // INITIAL_ENTRIES, and then the benchmark performs NUM_OPS operations. PUTs come from ENTRIES
+  // (and wrap around if exhausted), and GETs come from either INITIAL_ENTRIES, or the already
+  // written keys from ENTRIES.
   void DoMixedWorkloadBenchmark(benchmark::State& state) {
-    T idx(
-        state.range(0),
-        state.range(1));
     srand(0);
+    T store(LOG_SIZE_BYTES, state.range(0));
 
     constexpr int NUM_OPS = 10 * 1024 * 1024;
     // Warm up the index:
-    for (const auto& e: warm_up_entries) {
-      idx.Insert(e);
+    for (const auto& e: INITIAL_ENTRIES) {
+      store.Insert(e);
     }
 
     int put_cursor = 0;
@@ -96,15 +75,15 @@ class IndexFixture : public benchmark::Fixture {
     for (auto _: state) {
       for (int i = 0; i < NUM_OPS; ++i) {
         // State.range(2) == chance out of 100 that we do a PUT
-        if (rand() % 100 < state.range(2)) {
+        if (rand() % 100 < state.range(1)) {
           // Do PUT
-          idx.Insert(entries[(put_cursor++) % entries.size()]);
+          store.Insert(ENTRIES[(put_cursor++) % ENTRIES.size()]);
         } else {
           // Do GET
-          int get_idx = rand() % warm_up_entries.size();
-          const Entry& e = warm_up_entries[rand() % warm_up_entries.size()];
+          int get_store = rand() % INITIAL_ENTRIES.size();
+          const Entry& e = INITIAL_ENTRIES[get_store];
           string value;
-          if (!idx.Read(e.key, e.hash, &value)) {
+          if (!store.Read(e.key, e.hash, &value)) {
             ++misses;
           }
           ++get_counter;
@@ -112,68 +91,46 @@ class IndexFixture : public benchmark::Fixture {
       }
     }
 
-    // state.counters["GETS"] = get_counter;
+    state.counters["GETS"] = get_counter;
     // state.counters["PUTS"] = put_cursor;
     state.counters["Num misses"] = misses;
     state.counters["Total ops"] = get_counter + put_cursor;
-    state.counters["Overwritten"] = idx.log_overwritten();
-    state.counters["Index misses"] = idx.index_misses();
-    state.counters["Other key"] = idx.log_other_key();
+    state.counters["Overwritten"] = store.log_overwritten();
+    state.counters["Index misses"] = store.index_misses();
+    // state.counters["Other key"] = store.log_other_key();
     state.counters["Ops. /s"] =
         benchmark::Counter(get_counter + put_cursor,  benchmark::Counter::kIsRate);
   }
 };
 
-BENCHMARK_TEMPLATE_DEFINE_F(IndexFixture, StdMapStoreReadThroughput, StdMapStore)(benchmark::State& state) {
-  DoReadThroughputBenchmark(state);
-}
-BENCHMARK_TEMPLATE_DEFINE_F(IndexFixture, FormicaStoreReadThroughput, FormicaStore)(benchmark::State& state) {
-  DoReadThroughputBenchmark(state);
-}
-// BENCHMARK_REGISTER_F(IndexFixture, StdMapStoreReadThroughput)->Args({1024 * 1024 * 128, 512});
-// BENCHMARK_REGISTER_F(IndexFixture, FormicaStoreReadThroughput)->Args({1024 * 1024 * 128, 512});
-
-BENCHMARK_TEMPLATE_DEFINE_F(IndexFixture, StdMapStoreWriteThroughput, StdMapStore)(benchmark::State &state) {
-  DoWriteThroughputBenchmark(state);
-}
-
-BENCHMARK_TEMPLATE_DEFINE_F(IndexFixture, FormicaStoreWriteThroughput, FormicaStore)(benchmark::State &state) {
-  DoWriteThroughputBenchmark(state);
-}
-
-BENCHMARK_TEMPLATE_DEFINE_F(IndexFixture, ChainedLossyHashStoreWriteThroughput, ChainedLossyHashStore)(benchmark::State &state) {
-  DoWriteThroughputBenchmark(state);
-}
-
-BENCHMARK_TEMPLATE_DEFINE_F(IndexFixture, FormicaStoreMixedWorkloadThroughput, FormicaStore)(benchmark::State& state) {
+BENCHMARK_TEMPLATE_DEFINE_F(StoreBMFixture, FormicaStoreMixedWorkloadThroughput, FormicaStore)(benchmark::State& state) {
   DoMixedWorkloadBenchmark(state);
 }
 
-BENCHMARK_TEMPLATE_DEFINE_F(IndexFixture, StdMapStoreMixedWorkloadThroughput, StdMapStore)(benchmark::State& state) {
+BENCHMARK_TEMPLATE_DEFINE_F(StoreBMFixture, StdMapStoreMixedWorkloadThroughput, StdMapStore)(benchmark::State& state) {
   DoMixedWorkloadBenchmark(state);
 }
 
-BENCHMARK_TEMPLATE_DEFINE_F(IndexFixture, ChainedLossyHashStoreMixedWorkloadThroughput, ChainedLossyHashStore)(benchmark::State& state) {
+BENCHMARK_TEMPLATE_DEFINE_F(StoreBMFixture, ChainedLossyHashStoreMixedWorkloadThroughput, ChainedLossyHashStore)(benchmark::State& state) {
   DoMixedWorkloadBenchmark(state);
 }
 
-// BENCHMARK_REGISTER_F(IndexFixture, StdMapStoreWriteThroughput)->Args({1024 * 1024 * 128, 512});
-// BENCHMARK_REGISTER_F(IndexFixture, FormicaStoreWriteThroughput)->Args({1024 * 1024 * 128, 512});
-// BENCHMARK_REGISTER_F(IndexFixture, ChainedLossyHashStoreWriteThroughput)->Args({1024 * 1024 * 128, 512});
+static constexpr int NUM_BUCKETS = 250007;
 
-BENCHMARK_REGISTER_F(IndexFixture, FormicaStoreMixedWorkloadThroughput)->Threads(1)->
-    Args({1024 * 1024 * 256, 100000, 95})->Unit(benchmark::kMillisecond);
-BENCHMARK_REGISTER_F(IndexFixture, StdMapStoreMixedWorkloadThroughput)->Threads(1)->
-    Args({1024 * 1024 * 256, 512, 95})->Unit(benchmark::kMillisecond);
-BENCHMARK_REGISTER_F(IndexFixture, ChainedLossyHashStoreMixedWorkloadThroughput)->Threads(1)->
-    Args({1024 * 1024 * 256, 100000, 95})->Unit(benchmark::kMillisecond);
+// Benchmark each store with 5% PUTS
+BENCHMARK_REGISTER_F(StoreBMFixture, FormicaStoreMixedWorkloadThroughput)->Threads(1)->
+    Args({NUM_BUCKETS, 5})->Unit(benchmark::kMillisecond);
+BENCHMARK_REGISTER_F(StoreBMFixture, StdMapStoreMixedWorkloadThroughput)->Threads(1)->
+    Args({NUM_BUCKETS, 5})->Unit(benchmark::kMillisecond);
+BENCHMARK_REGISTER_F(StoreBMFixture, ChainedLossyHashStoreMixedWorkloadThroughput)->Threads(1)->
+    Args({NUM_BUCKETS, 5})->Unit(benchmark::kMillisecond);
 
-
-BENCHMARK_REGISTER_F(IndexFixture, FormicaStoreMixedWorkloadThroughput)->
-    Args({1024 * 1024 * 256, 100000, 50})->Unit(benchmark::kMillisecond);
-BENCHMARK_REGISTER_F(IndexFixture, StdMapStoreMixedWorkloadThroughput)->
-    Args({1024 * 1024 * 256, 4096, 50})->Unit(benchmark::kMillisecond);
-BENCHMARK_REGISTER_F(IndexFixture, ChainedLossyHashStoreMixedWorkloadThroughput)->
-    Args({1024 * 1024 * 256, 100000, 50})->Unit(benchmark::kMillisecond);
+// Benchmark each store with 50% PUTS
+BENCHMARK_REGISTER_F(StoreBMFixture, FormicaStoreMixedWorkloadThroughput)->
+    Args({NUM_BUCKETS, 50})->Unit(benchmark::kMillisecond);
+BENCHMARK_REGISTER_F(StoreBMFixture, StdMapStoreMixedWorkloadThroughput)->
+    Args({NUM_BUCKETS, 50})->Unit(benchmark::kMillisecond);
+BENCHMARK_REGISTER_F(StoreBMFixture, ChainedLossyHashStoreMixedWorkloadThroughput)->
+    Args({NUM_BUCKETS, 50})->Unit(benchmark::kMillisecond);
 
 BENCHMARK_MAIN();

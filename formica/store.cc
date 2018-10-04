@@ -25,12 +25,11 @@ StdMapStore::StdMapStore(space_t size) : log_(size) { }
 void StdMapStore::Insert(const Entry& entry) {
   // TODO: Could check if entry exists and use Update directly.
   offset_t offset = log_.Insert(entry.key, entry.value, entry.hash);
-  //  tag_t bucket_tag = ExtractHashTag(entry.hash);
   idx_[entry.key] = {entry.hash, offset};
 }
 
 bool StdMapStore::Update(const Entry& entry) {
-  auto it = idx_.find(entry.key); // ExtractHashTag(entry.hash));
+  auto it = idx_.find(entry.key);
   if (it == idx_.end()) return false;
 
   offset_t offset = log_.Update(it->second.second, entry.key, entry.value, entry.hash);
@@ -40,11 +39,11 @@ bool StdMapStore::Update(const Entry& entry) {
 }
 
 void StdMapStore::Delete(const string& key) {
-  // idx_.erase(ExtractHashTag(key);
+  idx_.erase(key);
 }
 
 bool StdMapStore::Read(const std::string& key, keyhash_t hash, std::string* value) {
-  auto it = idx_.find(key); // ExtractHashTag(hash));
+  auto it = idx_.find(key);
   if (it == idx_.end()) {
     ++index_misses_;
     return false;
@@ -70,7 +69,7 @@ LossyHash::LossyHash(bucket_count_t num_buckets) : num_buckets_(num_buckets) {
 
 offset_t LossyHash::Lookup(keyhash_t hash) {
   tag_t bucket_number = ExtractHashTag(hash);
-  Bucket* bucket = buckets_ + (bucket_number % num_buckets_);
+  Bucket* bucket = &(buckets_[bucket_number % num_buckets_]);
 
   tag_t log_tag = ExtractLogTag(hash);
   for (int i = 0; i < Bucket::NUM_ENTRIES; ++i) {
@@ -82,13 +81,13 @@ offset_t LossyHash::Lookup(keyhash_t hash) {
 
 void LossyHash::Insert(keyhash_t hash, offset_t offset, offset_t log_tail) {
   tag_t bucket_number = ExtractHashTag(hash);
-  Bucket* bucket = buckets_ + (bucket_number % num_buckets_);
+  Bucket* bucket = &(buckets_[bucket_number % num_buckets_]);
 
   tag_t log_tag = ExtractLogTag(hash);
 
-  // TODO: Use log_tail to find the 'oldest' entry and delete that.
+  // TODO: Use log_tail to find the 'oldest' entry and delete that, per the paper.
   // For now, use some of the hash to pick an entry at random.
-  int entry_idx = (0xFFFF & hash) % Bucket::NUM_ENTRIES;
+  int entry_idx = (0xF0F0F0F0 & hash) % Bucket::NUM_ENTRIES;
   for (int i = 0; i < Bucket::NUM_ENTRIES; ++i) {
     LossyHash::Entry* entry = &(bucket->entries[i]);
     if (entry->offset == -1 || entry->tag == log_tag) {
@@ -99,11 +98,11 @@ void LossyHash::Insert(keyhash_t hash, offset_t offset, offset_t log_tail) {
     }
   }
 
-  // No space, and no duplicate to overwrite.
   bucket->entries[entry_idx] = {log_tag, offset};
 }
 
-FormicaStore::FormicaStore(space_t size, bucket_count_t num_buckets) : idx_(num_buckets), log_(size) { }
+FormicaStore::FormicaStore(space_t size, bucket_count_t num_buckets)
+    : idx_(num_buckets), log_(size) { }
 
 void FormicaStore::Insert(const Entry& entry) {
   offset_t offset = log_.Insert(entry.key, entry.value, entry.hash);
@@ -112,7 +111,7 @@ void FormicaStore::Insert(const Entry& entry) {
 
 bool FormicaStore::Update(const Entry& entry) {
   // TODO - need to refactor because we want to avoid double lookup in the hash to find the offset
-  // and then rewrite it.
+  // and then rewrite it, i.e. need hash to return an `iterator` that we can reuse.
   return false;
 }
 
@@ -136,8 +135,6 @@ bool FormicaStore::Read(const std::string& key, keyhash_t hash, std::string* val
   return true;
 }
 
-static constexpr int CHAIN_LENGTH = 32;
-
 void ChainedLossyHashStore::Insert(const Entry& entry) {
   tag_t hash_tag = ExtractHashTag(entry.hash);
   bucket_count_t bucket_num = hash_tag % num_buckets_;
@@ -145,12 +142,13 @@ void ChainedLossyHashStore::Insert(const Entry& entry) {
   Bucket* bucket = &(buckets_[bucket_num]);
   Node* old = bucket->first;
 
-  Node* node = bucket->chain_len == CHAIN_LENGTH ? bucket->last : new Node();
+  // Only allocate if we're still expanding the chain, otherwise recycle the node we're evicting.
+  Node* node = bucket->chain_len == MAX_CHAIN_LENGTH ? bucket->last : new Node();
   node->log_tag = ExtractLogTag(entry.hash);
   node->key = entry.key;
   node->value = entry.value;
 
-  if (bucket->chain_len == CHAIN_LENGTH) {
+  if (bucket->chain_len == MAX_CHAIN_LENGTH) {
     node->prev->next = nullptr;
     bucket->last = node->prev;
     node->prev = nullptr;
@@ -180,6 +178,8 @@ bool ChainedLossyHashStore::Read(const string& key, keyhash_t hash, string* valu
     }
     node = node->next;
   }
+
+  ++index_misses_;
   return false;
 }
 
@@ -198,7 +198,7 @@ ChainedLossyHashStore::~ChainedLossyHashStore() {
       node = next;
     }
   }
-  delete buckets_;
+  delete[] buckets_;
 }
 
 }
